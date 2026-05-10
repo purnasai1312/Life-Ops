@@ -21,7 +21,7 @@ import { TextField } from '@/components/text-field';
 import { Typo } from '@/components/typography';
 import { Colors, DisplayFont, Radii } from '@/constants/Theme';
 import { isMissingSupabaseTableError, supabase } from '@/lib/supabase';
-import { useAppStore } from '@/store/useAppStore';
+import { getDefaultTargets, useAppStore } from '@/store/useAppStore';
 
 const INTENTIONS = [
   { key: 'clarity', label: 'Find clarity', icon: 'compass-outline' },
@@ -32,10 +32,12 @@ const INTENTIONS = [
   { key: 'present', label: 'Be present', icon: 'flower-outline' },
 ] as const;
 
-const GOALS = ['Feel healthier', 'Build consistency', 'Improve energy', 'Lose weight', 'Gain strength'];
+const GOALS = ['Lose weight', 'Gain muscle', 'Maintain', 'Feel healthier'];
 const ACTIVITY = ['Light', 'Moderate', 'Active', 'Very active'];
 const DIETS = ['Flexible', 'Vegetarian', 'Vegan', 'Mediterranean', 'High protein'];
-const HABITS = ['Walk daily', 'Drink water', 'Sleep earlier', 'Journal', 'Stretch', 'Plan meals'];
+const WORKOUTS = ['Gym', 'Home', 'Walking', 'Mixed'];
+const EXPERIENCE = ['Beginner', 'Intermediate', 'Advanced'];
+const HABITS = ['Walk daily', 'Drink water', 'Sleep earlier', 'Journal', 'Stretch', 'Plan meals', 'Protein each meal', 'Prep tomorrow'];
 
 export default function Onboarding() {
   const router = useRouter();
@@ -57,7 +59,15 @@ export default function Onboarding() {
   const [goal, setGoal] = useState(preferences.goal ?? '');
   const [activityLevel, setActivityLevel] = useState(preferences.activityLevel ?? '');
   const [dietPreference, setDietPreference] = useState(preferences.dietPreference ?? '');
+  const [workoutPreference, setWorkoutPreference] = useState(preferences.workoutPreference ?? '');
+  const [experienceLevel, setExperienceLevel] = useState(preferences.experienceLevel ?? '');
+  const [calorieTarget, setCalorieTarget] = useState(preferences.calorieTarget ?? '');
+  const [proteinTarget, setProteinTarget] = useState(preferences.proteinTarget ?? '');
+  const [waterTarget, setWaterTarget] = useState(preferences.waterTarget ?? '');
+  const [workoutFrequencyGoal, setWorkoutFrequencyGoal] = useState(preferences.workoutFrequencyGoal ?? '');
+  const [movementGoal, setMovementGoal] = useState(preferences.movementGoal ?? '');
   const [habits, setHabits] = useState<string[]>(preferences.habits ?? []);
+  const [habitPriorities, setHabitPriorities] = useState<string[]>(preferences.habitPriorities ?? preferences.habits ?? []);
   const [intentions, setIntentions] = useState<string[]>(preferences.intentions ?? []);
   const [focusStatement, setFocusStatement] = useState(preferences.focusStatement ?? '');
   const [saving, setSaving] = useState(false);
@@ -84,9 +94,24 @@ export default function Onboarding() {
     initializeProfile();
   }, [metadataName, preferences.hasCompletedOnboarding, user?.id]);
 
+  useEffect(() => {
+    const defaults = getDefaultTargets({ weight, goal, activityLevel });
+    if (!calorieTarget) setCalorieTarget(defaults.calorieTarget);
+    if (!proteinTarget) setProteinTarget(defaults.proteinTarget);
+    if (!waterTarget) setWaterTarget(defaults.waterTarget);
+    if (!workoutFrequencyGoal) setWorkoutFrequencyGoal(defaults.workoutFrequencyGoal);
+    if (!movementGoal) setMovementGoal(defaults.movementGoal);
+  }, [activityLevel, calorieTarget, goal, movementGoal, proteinTarget, waterTarget, weight, workoutFrequencyGoal]);
+
   const onboardedForThisUser =
     preferences.hasCompletedOnboarding &&
-    (!user?.id || !preferences.userId || preferences.userId === user.id);
+    (!user?.id || !preferences.userId || preferences.userId === user.id) &&
+    Boolean(preferences.name?.trim()) &&
+    Boolean(preferences.goal) &&
+    Boolean(preferences.workoutPreference) &&
+    Boolean(preferences.experienceLevel) &&
+    Boolean(preferences.calorieTarget) &&
+    Boolean(preferences.proteinTarget);
 
   if (onboardedForThisUser) {
     return <Redirect href="/(tabs)" />;
@@ -96,14 +121,16 @@ export default function Onboarding() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  const totalSteps = 6;
+  const totalSteps = 8;
   const canNext = Boolean(
     (step === 0 && name.trim().length > 0) ||
     (step === 1 && age.trim() && height.trim() && weight.trim()) ||
     (step === 2 && goal && activityLevel) ||
-    (step === 3 && dietPreference && habits.length > 0) ||
-    (step === 4 && intentions.length > 0) ||
-    (step === 5 && focusStatement.trim().length > 0)
+    (step === 3 && dietPreference && workoutPreference && experienceLevel) ||
+    (step === 4 && calorieTarget && proteinTarget && waterTarget && workoutFrequencyGoal && movementGoal) ||
+    (step === 5 && habitPriorities.length > 0) ||
+    (step === 6 && intentions.length > 0) ||
+    (step === 7 && focusStatement.trim().length > 0)
   );
 
   const toggle = (value: string, setter: (next: string[]) => void, current: string[]) => {
@@ -121,6 +148,14 @@ export default function Onboarding() {
       goal,
       activity_level: activityLevel,
       diet_preference: dietPreference,
+      workout_preference: workoutPreference,
+      experience_level: experienceLevel,
+      calorie_target: Number(calorieTarget) || null,
+      protein_target: Number(proteinTarget) || null,
+      water_target: Number(waterTarget) || null,
+      workout_frequency_goal: Number(workoutFrequencyGoal) || null,
+      movement_goal: Number(movementGoal) || null,
+      habit_priorities: habitPriorities,
       habits,
       intentions,
       focus_statement: focusStatement.trim(),
@@ -135,6 +170,14 @@ export default function Onboarding() {
       goal,
       activity_level: activityLevel,
       diet_preference: dietPreference,
+      workout_preference: workoutPreference,
+      experience_level: experienceLevel,
+      calorie_target: Number(calorieTarget) || null,
+      protein_target: Number(proteinTarget) || null,
+      water_target: Number(waterTarget) || null,
+      workout_frequency_goal: Number(workoutFrequencyGoal) || null,
+      movement_goal: Number(movementGoal) || null,
+      habit_priorities: habitPriorities,
       habits,
       intentions,
       focus_statement: focusStatement.trim(),
@@ -170,6 +213,14 @@ export default function Onboarding() {
       goal,
       activityLevel,
       dietPreference,
+      workoutPreference,
+      experienceLevel,
+      calorieTarget,
+      proteinTarget,
+      waterTarget,
+      workoutFrequencyGoal,
+      movementGoal,
+      habitPriorities,
       habits,
       intentions,
       focusStatement,
@@ -267,19 +318,46 @@ export default function Onboarding() {
 
                 {step === 3 ? (
                   <>
-                    <Title eyebrow="Routines" title="Food and habits," accent="gently." />
+                    <Title eyebrow="Preferences" title="Food and movement," accent="your way." />
                     <Typo variant="eyebrow" color={Colors.inkMuted}>Diet preference</Typo>
                     <OptionGrid options={DIETS} selected={[dietPreference]} onPress={setDietPreference} />
-                    <Typo variant="eyebrow" color={Colors.inkMuted}>Habits to build</Typo>
-                    <OptionGrid
-                      options={HABITS}
-                      selected={habits}
-                      onPress={(value) => toggle(value, setHabits, habits)}
-                    />
+                    <Typo variant="eyebrow" color={Colors.inkMuted}>Workout preference</Typo>
+                    <OptionGrid options={WORKOUTS} selected={[workoutPreference]} onPress={setWorkoutPreference} />
+                    <Typo variant="eyebrow" color={Colors.inkMuted}>Experience level</Typo>
+                    <OptionGrid options={EXPERIENCE} selected={[experienceLevel]} onPress={setExperienceLevel} />
                   </>
                 ) : null}
 
                 {step === 4 ? (
+                  <>
+                    <Title eyebrow="Targets" title="Set the daily" accent="numbers." />
+                    <Typo variant="body">We calculated defaults from your profile. Adjust anything you already know.</Typo>
+                    <View style={{ gap: 12 }}>
+                      <TextField label="Daily calorie target" value={calorieTarget} onChangeText={setCalorieTarget} keyboardType="number-pad" />
+                      <TextField label="Protein target (grams)" value={proteinTarget} onChangeText={setProteinTarget} keyboardType="number-pad" />
+                      <TextField label="Water target (oz)" value={waterTarget} onChangeText={setWaterTarget} keyboardType="number-pad" />
+                      <TextField label="Workouts per week" value={workoutFrequencyGoal} onChangeText={setWorkoutFrequencyGoal} keyboardType="number-pad" />
+                      <TextField label="Daily step / movement goal" value={movementGoal} onChangeText={setMovementGoal} keyboardType="number-pad" />
+                    </View>
+                  </>
+                ) : null}
+
+                {step === 5 ? (
+                  <>
+                    <Title eyebrow="Priorities" title="Pick the habits" accent="to tend." />
+                    <Typo variant="body">These shape reminders, empty states, and quick prompts.</Typo>
+                    <OptionGrid
+                      options={HABITS}
+                      selected={habitPriorities}
+                      onPress={(value) => {
+                        toggle(value, setHabitPriorities, habitPriorities);
+                        if (!habits.includes(value)) setHabits((current) => [...current, value]);
+                      }}
+                    />
+                  </>
+                ) : null}
+
+                {step === 6 ? (
                   <>
                     <Title eyebrow="Intention" title="What do you want" accent="more of?" />
                     <Typo variant="body">Choose a few. This shapes your empty states and daily prompts.</Typo>
@@ -300,7 +378,7 @@ export default function Onboarding() {
                   </>
                 ) : null}
 
-                {step === 5 ? (
+                {step === 7 ? (
                   <>
                     <Title eyebrow="Compass" title="One sentence to" accent="guide the season." />
                     <Typo variant="body">A quiet north star for your dashboard and daily reset.</Typo>

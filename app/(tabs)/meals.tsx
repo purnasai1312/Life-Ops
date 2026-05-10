@@ -18,6 +18,8 @@ import {
   useAppStore,
 } from '@/store/useAppStore';
 import type { MealEntry, MealType } from '@/store/types';
+import { formatShortDate, lastNDates } from '@/utils/date';
+import { getMealSuggestions } from '@/utils/suggestions';
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
@@ -42,6 +44,7 @@ export default function MealsScreen() {
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState<MealEntry | null>(null);
   const [saving, setSaving] = useState(false);
+  const [range, setRange] = useState<'today' | '7' | '30'>('today');
 
   useEffect(() => {
     loadMeals().catch(() => {});
@@ -68,6 +71,16 @@ export default function MealsScreen() {
   const targets = useMemo(() => getNutritionTargets(preferences), [preferences]);
   const caloriePct = calculateCaloriePercentage(totals.calories, targets.calories);
   const proteinPct = calculateProteinPercentage(totals.proteinG, targets.proteinG);
+  const suggestions = useMemo(() => getMealSuggestions(preferences), [preferences]);
+  const rangeDates = useMemo(
+    () => (range === 'today' ? [today] : lastNDates(range === '7' ? 7 : 30)),
+    [range, today]
+  );
+  const historyMeals = useMemo(
+    () => meals.filter((meal) => rangeDates.includes(meal.date)),
+    [meals, rangeDates]
+  );
+  const groupedMeals = useMemo(() => groupMeals(historyMeals), [historyMeals]);
 
   const reset = () => {
     setForm(emptyForm);
@@ -169,6 +182,46 @@ export default function MealsScreen() {
         </Card>
       </Animated.View>
 
+      {suggestions.length > 0 ? (
+        <Animated.View entering={FadeInDown.delay(125).duration(500)} style={{ gap: 12 }}>
+          <Typo variant="eyebrow" color={Colors.inkMuted}>
+            Suggested for your goal
+          </Typo>
+          <View style={{ gap: 10 }}>
+            {suggestions.map((meal) => (
+              <Card key={meal.title} padding={16}>
+                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Typo variant="bodyEmphasis">{meal.title}</Typo>
+                    <Typo variant="caption" color={Colors.inkMuted}>
+                      {meal.calories} cal · {meal.proteinG}g protein · {meal.mealType}
+                    </Typo>
+                  </View>
+                  <Button
+                    title="Add"
+                    icon="add"
+                    size="sm"
+                    variant="secondary"
+                    onPress={() =>
+                      addMeal({
+                        mealType: meal.mealType,
+                        foodName: meal.title,
+                        calories: meal.calories,
+                        proteinG: meal.proteinG,
+                        carbsG: meal.carbsG,
+                        fatG: meal.fatG,
+                        notes: meal.notes,
+                        date: today,
+                      }).catch(() => {})
+                    }
+                  />
+                </View>
+              </Card>
+            ))}
+          </View>
+        </Animated.View>
+      ) : null}
+
       <Animated.View entering={FadeInDown.delay(150).duration(500)}>
         <Card padding={20}>
           <View style={{ gap: 14 }}>
@@ -247,10 +300,17 @@ export default function MealsScreen() {
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(200).duration(500)} style={{ gap: 12 }}>
-        <Typo variant="eyebrow" color={Colors.inkMuted}>
-          Today&apos;s meals
-        </Typo>
-        {todayMeals.length === 0 ? (
+        <View style={{ gap: 10 }}>
+          <Typo variant="eyebrow" color={Colors.inkMuted}>
+            Meal history
+          </Typo>
+          <Segmented
+            options={['today', '7', '30'] as const}
+            value={range}
+            onChange={setRange}
+          />
+        </View>
+        {historyMeals.length === 0 ? (
           <EmptyState
             icon="restaurant-outline"
             title="No meals logged"
@@ -258,8 +318,20 @@ export default function MealsScreen() {
           />
         ) : (
           <View style={{ gap: 10 }}>
-            {todayMeals.map((meal) => (
-              <MealCard key={meal.id} meal={meal} onEdit={startEdit} onDelete={remove} />
+            {groupedMeals.map((group) => (
+              <Card key={group.date} padding={0}>
+                <View style={{ padding: 16, gap: 4, borderBottomWidth: 1, borderBottomColor: Colors.borderSoft }}>
+                  <Typo variant="bodyEmphasis">{group.date === today ? 'Today' : formatShortDate(group.date)}</Typo>
+                  <Typo variant="caption" color={Colors.inkMuted}>
+                    {Math.round(group.calories)} calories · {Math.round(group.proteinG)}g protein
+                  </Typo>
+                </View>
+                <View style={{ gap: 0 }}>
+                  {group.items.map((meal) => (
+                    <MealCard key={meal.id} meal={meal} onEdit={startEdit} onDelete={remove} flat />
+                  ))}
+                </View>
+              </Card>
             ))}
           </View>
         )}
@@ -292,7 +364,7 @@ function SmallTotal({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Segmented<T extends string>({ options, value, onChange }: { options: T[]; value: T; onChange: (value: T) => void }) {
+function Segmented<T extends string>({ options, value, onChange }: { options: readonly T[]; value: T; onChange: (value: T) => void }) {
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
       {options.map((option) => {
@@ -319,36 +391,53 @@ function Segmented<T extends string>({ options, value, onChange }: { options: T[
   );
 }
 
-function MealCard({ meal, onEdit, onDelete }: { meal: MealEntry; onEdit: (meal: MealEntry) => void; onDelete: (meal: MealEntry) => void }) {
+function MealCard({ meal, onEdit, onDelete, flat }: { meal: MealEntry; onEdit: (meal: MealEntry) => void; onDelete: (meal: MealEntry) => void; flat?: boolean }) {
+  const content = (
+    <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+      <View
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: 18,
+          backgroundColor: Colors.accentSoft,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Ionicons name="restaurant-outline" size={20} color={Colors.accentInk} />
+      </View>
+      <View style={{ flex: 1, gap: 4 }}>
+        <Typo variant="bodyEmphasis">{meal.foodName}</Typo>
+        <Typo variant="caption" color={Colors.inkMuted}>
+          {meal.mealType} · {Math.round(meal.calories)} cal · {Math.round(meal.proteinG)}g protein
+        </Typo>
+        {meal.notes ? <Typo variant="caption">{meal.notes}</Typo> : null}
+      </View>
+      <Pressable onPress={() => onEdit(meal)} hitSlop={8} style={{ padding: 4 }}>
+        <Ionicons name="create-outline" size={18} color={Colors.inkMuted} />
+      </Pressable>
+      <Pressable onPress={() => onDelete(meal)} hitSlop={8} style={{ padding: 4 }}>
+        <Ionicons name="trash-outline" size={18} color={Colors.inkMuted} />
+      </Pressable>
+    </View>
+  );
+  if (flat) return <View style={{ padding: 16 }}>{content}</View>;
   return (
     <Card padding={18}>
-      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-        <View
-          style={{
-            width: 42,
-            height: 42,
-            borderRadius: 18,
-            backgroundColor: Colors.accentSoft,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Ionicons name="restaurant-outline" size={20} color={Colors.accentInk} />
-        </View>
-        <View style={{ flex: 1, gap: 4 }}>
-          <Typo variant="bodyEmphasis">{meal.foodName}</Typo>
-          <Typo variant="caption" color={Colors.inkMuted}>
-            {meal.mealType} · {Math.round(meal.calories)} cal · {Math.round(meal.proteinG)}g protein
-          </Typo>
-          {meal.notes ? <Typo variant="caption">{meal.notes}</Typo> : null}
-        </View>
-        <Pressable onPress={() => onEdit(meal)} hitSlop={8} style={{ padding: 4 }}>
-          <Ionicons name="create-outline" size={18} color={Colors.inkMuted} />
-        </Pressable>
-        <Pressable onPress={() => onDelete(meal)} hitSlop={8} style={{ padding: 4 }}>
-          <Ionicons name="trash-outline" size={18} color={Colors.inkMuted} />
-        </Pressable>
-      </View>
+      {content}
     </Card>
   );
+}
+
+function groupMeals(meals: MealEntry[]) {
+  const map = new Map<string, MealEntry[]>();
+  for (const meal of meals) map.set(meal.date, [...(map.get(meal.date) ?? []), meal]);
+  return [...map.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([date, items]) => ({
+      date,
+      items,
+      calories: items.reduce((sum, meal) => sum + meal.calories, 0),
+      proteinG: items.reduce((sum, meal) => sum + meal.proteinG, 0),
+    }));
 }

@@ -39,6 +39,7 @@ export default function ReflectScreen() {
   const [value, setValue] = useState<MoodValue | null>(todayMood?.value ?? null);
   const [note, setNote] = useState(todayMood?.note ?? '');
   const [saved, setSaved] = useState(false);
+  const [range, setRange] = useState<'today' | '7' | '30'>('7');
 
   useEffect(() => {
     loadReflections().catch(() => {});
@@ -61,9 +62,16 @@ export default function ReflectScreen() {
     return map;
   }, [moods]);
 
+  const historyDates = useMemo(
+    () => (range === 'today' ? [today] : lastNDates(range === '7' ? 7 : 30)),
+    [range, today]
+  );
   const history = useMemo(
-    () => [...moods].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6),
-    [moods]
+    () =>
+      [...moods]
+        .filter((m) => historyDates.includes(m.date))
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    [historyDates, moods]
   );
 
   const avg = useMemo(
@@ -290,7 +298,10 @@ export default function ReflectScreen() {
         <Typo variant="eyebrow" color={Colors.inkMuted}>
           Letters to self
         </Typo>
-        <Typo variant="heading">Recent entries</Typo>
+        <View style={{ gap: 10 }}>
+          <Typo variant="heading">Check-in history</Typo>
+          <Segmented options={['today', '7', '30'] as const} value={range} onChange={setRange} />
+        </View>
         {history.length === 0 ? (
           <Card tone="outlined" padding={24}>
             <Typo variant="body" align="center" color={Colors.inkMuted}>
@@ -392,5 +403,32 @@ export default function ReflectScreen() {
         </Card>
       </Animated.View>
     </Screen>
+  );
+}
+
+function Segmented<T extends string>({ options, value, onChange }: { options: readonly T[]; value: T; onChange: (value: T) => void }) {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+      {options.map((option) => {
+        const active = option === value;
+        return (
+          <Pressable
+            key={option}
+            onPress={() => onChange(option)}
+            style={({ pressed }) => ({
+              paddingHorizontal: 12,
+              paddingVertical: 9,
+              borderRadius: Radii.pill,
+              backgroundColor: active ? Colors.ink : Colors.surfaceMuted,
+              opacity: pressed ? 0.75 : 1,
+            })}
+          >
+            <Typo variant="label" color={active ? Colors.bgElevated : Colors.inkSoft}>
+              {option}
+            </Typo>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }

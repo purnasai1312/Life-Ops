@@ -14,6 +14,7 @@ Start Expo:
 
 ```bash
 npx expo start
+npx expo start --clear
 ```
 
 ## Supabase

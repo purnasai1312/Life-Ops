@@ -26,6 +26,15 @@ const todayISO = () => {
   return `${y}-${m}-${day}`;
 };
 
+const daysAgoISO = (days: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 const uid = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -34,11 +43,37 @@ const asNumber = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const parseWeightLb = (weight?: string) => {
+  const raw = Number(String(weight ?? '').replace(/[^\d.]/g, ''));
+  if (!Number.isFinite(raw) || raw <= 0) return 160;
+  return /kg/i.test(weight ?? '') ? raw * 2.20462 : raw;
+};
+
 const getCurrentUserId = async () => {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) throw error ?? new Error('No authenticated user.');
   return data.user.id;
 };
+
+const isProfileComplete = (preferences: Preferences) =>
+  Boolean(
+    preferences.userId &&
+      preferences.hasCompletedOnboarding &&
+      preferences.name?.trim() &&
+      preferences.age &&
+      preferences.height?.trim() &&
+      preferences.weight?.trim() &&
+      preferences.goal?.trim() &&
+      preferences.activityLevel?.trim() &&
+      preferences.dietPreference?.trim() &&
+      preferences.workoutPreference?.trim() &&
+      preferences.experienceLevel?.trim() &&
+      preferences.calorieTarget &&
+      preferences.proteinTarget &&
+      preferences.waterTarget &&
+      preferences.workoutFrequencyGoal &&
+      preferences.movementGoal
+  );
 
 const toTimestamp = (value: string | null | undefined) =>
   value ? new Date(value).getTime() : Date.now();
@@ -66,6 +101,7 @@ interface AppState {
   loadProfile: () => Promise<void>;
   saveProfile: (partial: Partial<Preferences>) => Promise<void>;
   resetAll: () => void;
+  resetOnboardingForTesting: () => Promise<void>;
 
   // Habits
   addHabit: (input: {
@@ -194,6 +230,14 @@ export const useAppStore = create<AppState>()(
             goal: profile.goal,
             activityLevel: profile.activityLevel,
             dietPreference: profile.dietPreference,
+            workoutPreference: profile.workoutPreference,
+            experienceLevel: profile.experienceLevel,
+            calorieTarget: profile.calorieTarget,
+            proteinTarget: profile.proteinTarget,
+            waterTarget: profile.waterTarget,
+            workoutFrequencyGoal: profile.workoutFrequencyGoal,
+            movementGoal: profile.movementGoal,
+            habitPriorities: profile.habitPriorities,
             habits: profile.habits,
             intentions: profile.intentions,
             hasCompletedOnboarding: true,
@@ -212,12 +256,28 @@ export const useAppStore = create<AppState>()(
           const { data, error } = await supabase
             .from('profiles')
             .select(
-              'id,name,age,height,weight,goal,activity_level,diet_preference,workout_preference,habits,intentions,focus_statement,has_completed_onboarding,notifications_enabled,week_starts_on_monday'
+              'id,name,age,height,weight,goal,activity_level,diet_preference,workout_preference,experience_level,calorie_target,protein_target,water_target,workout_frequency_goal,movement_goal,habit_priorities,habits,intentions,focus_statement,has_completed_onboarding,notifications_enabled,week_starts_on_monday'
             )
             .eq('id', userId)
             .maybeSingle();
           if (error) throw error;
-          if (!data) return;
+          if (!data) {
+            set((state) => ({
+              preferences: {
+                ...defaultPreferences,
+                name: state.preferences.userId === userId ? state.preferences.name : '',
+                userId,
+                hasCompletedOnboarding: false,
+              },
+              habits: state.preferences.userId === userId ? state.habits : [],
+              tasks: state.preferences.userId === userId ? state.tasks : [],
+              goals: state.preferences.userId === userId ? state.goals : [],
+              moods: state.preferences.userId === userId ? state.moods : [],
+              meals: state.preferences.userId === userId ? state.meals : [],
+              workouts: state.preferences.userId === userId ? state.workouts : [],
+            }));
+            return;
+          }
           set((state) => ({
             preferences: {
               ...state.preferences,
@@ -230,6 +290,13 @@ export const useAppStore = create<AppState>()(
               activityLevel: data.activity_level ?? undefined,
               dietPreference: data.diet_preference ?? undefined,
               workoutPreference: data.workout_preference ?? undefined,
+              experienceLevel: data.experience_level ?? undefined,
+              calorieTarget: data.calorie_target == null ? undefined : String(data.calorie_target),
+              proteinTarget: data.protein_target == null ? undefined : String(data.protein_target),
+              waterTarget: data.water_target == null ? undefined : String(data.water_target),
+              workoutFrequencyGoal: data.workout_frequency_goal == null ? undefined : String(data.workout_frequency_goal),
+              movementGoal: data.movement_goal == null ? undefined : String(data.movement_goal),
+              habitPriorities: data.habit_priorities ?? undefined,
               habits: data.habits ?? undefined,
               intentions: data.intentions ?? undefined,
               focusStatement: data.focus_statement ?? '',
@@ -237,6 +304,12 @@ export const useAppStore = create<AppState>()(
               notificationsEnabled: data.notifications_enabled ?? true,
               weekStartsOnMonday: data.week_starts_on_monday ?? true,
             },
+            habits: state.preferences.userId && state.preferences.userId !== userId ? [] : state.habits,
+            tasks: state.preferences.userId && state.preferences.userId !== userId ? [] : state.tasks,
+            goals: state.preferences.userId && state.preferences.userId !== userId ? [] : state.goals,
+            moods: state.preferences.userId && state.preferences.userId !== userId ? [] : state.moods,
+            meals: state.preferences.userId && state.preferences.userId !== userId ? [] : state.meals,
+            workouts: state.preferences.userId && state.preferences.userId !== userId ? [] : state.workouts,
           }));
         } catch (error) {
           if (!isMissingSupabaseTableError(error)) {
@@ -263,8 +336,15 @@ export const useAppStore = create<AppState>()(
             activity_level: next.activityLevel?.trim() || null,
             diet_preference: next.dietPreference?.trim() || null,
             workout_preference: next.workoutPreference?.trim() || null,
+            experience_level: next.experienceLevel?.trim() || null,
+            calorie_target: next.calorieTarget ? Number(next.calorieTarget) || null : null,
+            protein_target: next.proteinTarget ? Number(next.proteinTarget) || null : null,
+            water_target: next.waterTarget ? Number(next.waterTarget) || null : null,
+            workout_frequency_goal: next.workoutFrequencyGoal ? Number(next.workoutFrequencyGoal) || null : null,
+            movement_goal: next.movementGoal ? Number(next.movementGoal) || null : null,
+            habit_priorities: next.habitPriorities ?? [],
             focus_statement: next.focusStatement?.trim() || null,
-            has_completed_onboarding: next.hasCompletedOnboarding,
+            has_completed_onboarding: isProfileComplete({ ...next, userId }),
           };
           const { error: profileError } = await supabase.from('profiles').upsert(profile);
           if (profileError) throw profileError;
@@ -278,17 +358,31 @@ export const useAppStore = create<AppState>()(
               activity_level: profile.activity_level,
               diet_preference: profile.diet_preference,
               workout_preference: profile.workout_preference,
+              experience_level: profile.experience_level,
+              calorie_target: profile.calorie_target,
+              protein_target: profile.protein_target,
+              water_target: profile.water_target,
+              workout_frequency_goal: profile.workout_frequency_goal,
+              movement_goal: profile.movement_goal,
+              habit_priorities: profile.habit_priorities,
               focus_statement: profile.focus_statement,
               habits: next.habits ?? [],
               intentions: next.intentions ?? [],
-              completed_at: next.hasCompletedOnboarding ? new Date().toISOString() : null,
+              completed_at: profile.has_completed_onboarding ? new Date().toISOString() : null,
             },
             { onConflict: 'user_id' }
           );
           if (onboardingError && !isMissingSupabaseTableError(onboardingError)) {
             throw onboardingError;
           }
-          set((state) => ({ preferences: { ...state.preferences, ...partial, userId } }));
+          set((state) => ({
+            preferences: {
+              ...state.preferences,
+              ...partial,
+              userId,
+              hasCompletedOnboarding: profile.has_completed_onboarding,
+            },
+          }));
         } catch (error) {
           set({ syncError: (error as Error).message });
           throw error;
@@ -313,6 +407,25 @@ export const useAppStore = create<AppState>()(
           },
           syncError: undefined,
         })),
+
+      resetOnboardingForTesting: async () => {
+        const userId = await getCurrentUserId();
+        await supabase
+          .from('profiles')
+          .update({ has_completed_onboarding: false })
+          .eq('id', userId);
+        await supabase
+          .from('onboarding')
+          .update({ completed_at: null })
+          .eq('user_id', userId);
+        set((state) => ({
+          preferences: {
+            ...state.preferences,
+            userId,
+            hasCompletedOnboarding: false,
+          },
+        }));
+      },
 
       addHabit: ({ title, icon, color, cadence }) =>
         set((state) => ({
@@ -424,6 +537,7 @@ export const useAppStore = create<AppState>()(
             .from('reflections')
             .select('id,reflection_date,mood_value,note,created_at')
             .eq('user_id', userId)
+            .gte('reflection_date', daysAgoISO(29))
             .order('reflection_date', { ascending: false })
             .limit(30);
           if (error) throw error;
@@ -517,6 +631,7 @@ export const useAppStore = create<AppState>()(
             .from('meals')
             .select('id,user_id,name,description,meal_type,meal_date,calories,protein_g,carbs_g,fat_g,created_at')
             .eq('user_id', userId)
+            .gte('meal_date', daysAgoISO(29))
             .order('meal_date', { ascending: false })
             .order('created_at', { ascending: false })
             .limit(60);
@@ -629,6 +744,7 @@ export const useAppStore = create<AppState>()(
             .from('workouts')
             .select('id,user_id,title,workout_type,scheduled_for,duration_minutes,notes,created_at')
             .eq('user_id', userId)
+            .gte('scheduled_for', daysAgoISO(29))
             .order('scheduled_for', { ascending: false })
             .order('created_at', { ascending: false })
             .limit(60);
@@ -856,8 +972,9 @@ export const clampPercentage = (value: number) =>
   Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
 
 export const getNutritionTargets = (preferences: Preferences) => {
-  const weight = Number(preferences.weight);
-  const weightLb = Number.isFinite(weight) && weight > 0 ? weight : 160;
+  const manualCalories = Number(preferences.calorieTarget);
+  const manualProtein = Number(preferences.proteinTarget);
+  const weightLb = parseWeightLb(preferences.weight);
   const goal = preferences.goal?.toLowerCase() ?? '';
   const activity = preferences.activityLevel?.toLowerCase() ?? '';
   const baseCalories = goal.includes('lose')
@@ -871,8 +988,37 @@ export const getNutritionTargets = (preferences: Preferences) => {
       ? -150
       : 0;
   return {
-    calories: baseCalories + activityAdjustment,
-    proteinG: Math.round(weightLb * 0.7),
+    calories:
+      Number.isFinite(manualCalories) && manualCalories > 0
+        ? Math.round(manualCalories)
+        : baseCalories + activityAdjustment,
+    proteinG:
+      Number.isFinite(manualProtein) && manualProtein > 0
+        ? Math.round(manualProtein)
+        : Math.round(weightLb * (goal.includes('gain') || goal.includes('muscle') ? 0.85 : 0.7)),
+  };
+};
+
+export const getDefaultTargets = (input: {
+  weight?: string;
+  goal?: string;
+  activityLevel?: string;
+}) => {
+  const preferences: Preferences = {
+    ...defaultPreferences,
+    weight: input.weight,
+    goal: input.goal,
+    activityLevel: input.activityLevel,
+  };
+  const nutrition = getNutritionTargets(preferences);
+  const goal = input.goal?.toLowerCase() ?? '';
+  const activity = input.activityLevel?.toLowerCase() ?? '';
+  return {
+    calorieTarget: String(nutrition.calories),
+    proteinTarget: String(nutrition.proteinG),
+    waterTarget: activity.includes('active') ? '100' : '80',
+    workoutFrequencyGoal: goal.includes('gain') || goal.includes('muscle') ? '4' : '3',
+    movementGoal: goal.includes('lose') ? '9000' : activity.includes('light') ? '6500' : '8000',
   };
 };
 

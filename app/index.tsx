@@ -21,10 +21,7 @@ import { useAuth } from '@/lib/auth';
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export default function SplashScreen() {
-  const hasOnboarded = useAppStore(
-    (s) => s.preferences.hasCompletedOnboarding
-  );
-  const onboardedUserId = useAppStore((s) => s.preferences.userId);
+  const loadProfile = useAppStore((s) => s.loadProfile);
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const [redirect, setRedirect] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
@@ -54,16 +51,26 @@ export default function SplashScreen() {
       if (!isAuthenticated) {
         // Not logged in → go to login
         setRedirect('/(auth)/login');
-      } else if (!hasOnboarded || (onboardedUserId && user?.id && onboardedUserId !== user.id)) {
-        // Logged in but not onboarded → go to onboarding
-        setRedirect('/onboarding');
       } else {
-        // Logged in and onboarded → go to main app
-        setRedirect('/(tabs)');
+        loadProfile()
+          .then(() => {
+            const preferences = useAppStore.getState().preferences;
+            const readyForTabs =
+              preferences.userId === user?.id &&
+              preferences.hasCompletedOnboarding &&
+              Boolean(preferences.name?.trim()) &&
+              Boolean(preferences.goal) &&
+              Boolean(preferences.workoutPreference) &&
+              Boolean(preferences.experienceLevel) &&
+              Boolean(preferences.calorieTarget) &&
+              Boolean(preferences.proteinTarget);
+            setRedirect(readyForTabs ? '/(tabs)' : '/onboarding');
+          })
+          .catch(() => setRedirect('/onboarding'));
       }
     }, 1600);
     return () => clearTimeout(t);
-  }, [isAuthenticated, authLoading, hasOnboarded, onboardedUserId, user?.id]);
+  }, [isAuthenticated, authLoading, loadProfile, user?.id]);
 
   const rotatingStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],

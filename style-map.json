@@ -1,0 +1,798 @@
+{
+  "version": 1,
+  "generatedAt": 1778371894480,
+  "entries": {
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:44": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 44
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "flex": {
+              "line": 46,
+              "col": 16,
+              "endCol": 17,
+              "raw": "1"
+            },
+            "alignItems": {
+              "line": 48,
+              "col": 22,
+              "endCol": 30,
+              "raw": "'center'"
+            },
+            "justifyContent": {
+              "line": 49,
+              "col": 26,
+              "endCol": 34,
+              "raw": "'center'"
+            },
+            "paddingHorizontal": {
+              "line": 50,
+              "col": 29,
+              "endCol": 31,
+              "raw": "32"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:53": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 53
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "alignItems": {
+              "line": 53,
+              "col": 76,
+              "endCol": 84,
+              "raw": "'center'"
+            },
+            "gap": {
+              "line": 53,
+              "col": 91,
+              "endCol": 93,
+              "raw": "16"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:54": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 54
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "width": {
+              "line": 56,
+              "col": 21,
+              "endCol": 23,
+              "raw": "64"
+            },
+            "height": {
+              "line": 57,
+              "col": 22,
+              "endCol": 24,
+              "raw": "64"
+            },
+            "borderRadius": {
+              "line": 58,
+              "col": 28,
+              "endCol": 30,
+              "raw": "32"
+            },
+            "alignItems": {
+              "line": 60,
+              "col": 26,
+              "endCol": 34,
+              "raw": "'center'"
+            },
+            "justifyContent": {
+              "line": 61,
+              "col": 30,
+              "endCol": 38,
+              "raw": "'center'"
+            },
+            "marginBottom": {
+              "line": 62,
+              "col": 28,
+              "endCol": 29,
+              "raw": "8"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:67": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 67
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "fontSize": {
+              "line": 70,
+              "col": 24,
+              "endCol": 26,
+              "raw": "22"
+            },
+            "textAlign": {
+              "line": 72,
+              "col": 25,
+              "endCol": 33,
+              "raw": "'center'"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:77": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 77
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "fontSize": {
+              "line": 80,
+              "col": 24,
+              "endCol": 26,
+              "raw": "15"
+            },
+            "textAlign": {
+              "line": 82,
+              "col": 25,
+              "endCol": 33,
+              "raw": "'center'"
+            },
+            "lineHeight": {
+              "line": 83,
+              "col": 26,
+              "endCol": 28,
+              "raw": "22"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:87": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 87
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "fontSize": {
+              "line": 87,
+              "col": 65,
+              "endCol": 67,
+              "raw": "15"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:91": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 91
+      },
+      "styles": [
+        {
+          "origin": "dynamic",
+          "resolvable": false
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:102": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 102
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "fontSize": {
+              "line": 102,
+              "col": 65,
+              "endCol": 67,
+              "raw": "15"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:113": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 113
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "flex": {
+              "line": 115,
+              "col": 23,
+              "endCol": 24,
+              "raw": "1"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:117": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 117
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "flex": {
+              "line": 119,
+              "col": 18,
+              "endCol": 19,
+              "raw": "1"
+            },
+            "paddingHorizontal": {
+              "line": 122,
+              "col": 31,
+              "endCol": 33,
+              "raw": "24"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:126": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 126
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "marginBottom": {
+              "line": 136,
+              "col": 28,
+              "endCol": 30,
+              "raw": "32"
+            },
+            "width": {
+              "line": 137,
+              "col": 21,
+              "endCol": 23,
+              "raw": "40"
+            },
+            "height": {
+              "line": 138,
+              "col": 22,
+              "endCol": 24,
+              "raw": "40"
+            },
+            "borderRadius": {
+              "line": 139,
+              "col": 28,
+              "endCol": 30,
+              "raw": "20"
+            },
+            "alignItems": {
+              "line": 141,
+              "col": 26,
+              "endCol": 34,
+              "raw": "'center'"
+            },
+            "justifyContent": {
+              "line": 142,
+              "col": 30,
+              "endCol": 38,
+              "raw": "'center'"
+            },
+            "borderWidth": {
+              "line": 143,
+              "col": 27,
+              "endCol": 28,
+              "raw": "1"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:150": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 150
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "gap": {
+              "line": 150,
+              "col": 71,
+              "endCol": 73,
+              "raw": "12"
+            },
+            "marginBottom": {
+              "line": 150,
+              "col": 89,
+              "endCol": 91,
+              "raw": "36"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:151": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 151
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "width": {
+              "line": 153,
+              "col": 23,
+              "endCol": 25,
+              "raw": "52"
+            },
+            "height": {
+              "line": 154,
+              "col": 24,
+              "endCol": 26,
+              "raw": "52"
+            },
+            "borderRadius": {
+              "line": 155,
+              "col": 30,
+              "endCol": 32,
+              "raw": "26"
+            },
+            "alignItems": {
+              "line": 157,
+              "col": 28,
+              "endCol": 36,
+              "raw": "'center'"
+            },
+            "justifyContent": {
+              "line": 158,
+              "col": 32,
+              "endCol": 40,
+              "raw": "'center'"
+            },
+            "marginBottom": {
+              "line": 159,
+              "col": 30,
+              "endCol": 31,
+              "raw": "4"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:164": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 164
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "fontSize": {
+              "line": 167,
+              "col": 26,
+              "endCol": 28,
+              "raw": "24"
+            },
+            "lineHeight": {
+              "line": 168,
+              "col": 28,
+              "endCol": 30,
+              "raw": "30"
+            },
+            "letterSpacing": {
+              "line": 169,
+              "col": 31,
+              "endCol": 35,
+              "raw": "-0.3"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:175": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 175
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "fontSize": {
+              "line": 176,
+              "col": 60,
+              "endCol": 62,
+              "raw": "15"
+            },
+            "lineHeight": {
+              "line": 176,
+              "col": 105,
+              "endCol": 107,
+              "raw": "22"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:182": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 182
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "gap": {
+              "line": 182,
+              "col": 86,
+              "endCol": 88,
+              "raw": "22"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:198": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 198
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "flexDirection": {
+              "line": 201,
+              "col": 33,
+              "endCol": 38,
+              "raw": "'row'"
+            },
+            "alignItems": {
+              "line": 202,
+              "col": 30,
+              "endCol": 38,
+              "raw": "'center'"
+            },
+            "gap": {
+              "line": 203,
+              "col": 23,
+              "endCol": 25,
+              "raw": "10"
+            },
+            "paddingHorizontal": {
+              "line": 204,
+              "col": 37,
+              "endCol": 39,
+              "raw": "14"
+            },
+            "paddingVertical": {
+              "line": 205,
+              "col": 35,
+              "endCol": 37,
+              "raw": "12"
+            },
+            "borderWidth": {
+              "line": 208,
+              "col": 31,
+              "endCol": 32,
+              "raw": "1"
+            },
+            "borderColor": {
+              "line": 209,
+              "col": 31,
+              "endCol": 56,
+              "raw": "'rgba(184, 63, 43, 0.12)'"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:213": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 213
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "fontSize": {
+              "line": 214,
+              "col": 64,
+              "endCol": 66,
+              "raw": "13"
+            },
+            "flex": {
+              "line": 214,
+              "col": 99,
+              "endCol": 100,
+              "raw": "1"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:223": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 223
+      },
+      "styles": [
+        {
+          "origin": "dynamic",
+          "resolvable": false
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:239": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 239
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "fontSize": {
+              "line": 242,
+              "col": 30,
+              "endCol": 32,
+              "raw": "16"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:251": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 251
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "alignSelf": {
+              "line": 253,
+              "col": 34,
+              "endCol": 42,
+              "raw": "'center'"
+            },
+            "paddingVertical": {
+              "line": 253,
+              "col": 61,
+              "endCol": 63,
+              "raw": "12"
+            }
+          }
+        }
+      ]
+    },
+    "ForgotPasswordScreen@app/(auth)/forgot-password.tsx:256": {
+      "element": {
+        "file": "app/(auth)/forgot-password.tsx",
+        "line": 256
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "app/(auth)/forgot-password.tsx",
+          "properties": {
+            "fontSize": {
+              "line": 256,
+              "col": 66,
+              "endCol": 68,
+              "raw": "14"
+            }
+          }
+        }
+      ]
+    },
+    "AuthInput@components/auth-input.tsx:33": {
+      "element": {
+        "file": "components/auth-input.tsx",
+        "line": 33
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "components/auth-input.tsx",
+          "properties": {
+            "gap": {
+              "line": 33,
+              "col": 24,
+              "endCol": 25,
+              "raw": "8"
+            }
+          }
+        }
+      ]
+    },
+    "AuthInput@components/auth-input.tsx:35": {
+      "element": {
+        "file": "components/auth-input.tsx",
+        "line": 35
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "components/auth-input.tsx",
+          "properties": {
+            "fontSize": {
+              "line": 38,
+              "col": 22,
+              "endCol": 24,
+              "raw": "14"
+            }
+          }
+        }
+      ]
+    },
+    "AuthInput@components/auth-input.tsx:45": {
+      "element": {
+        "file": "components/auth-input.tsx",
+        "line": 45
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "components/auth-input.tsx",
+          "properties": {
+            "flexDirection": {
+              "line": 47,
+              "col": 25,
+              "endCol": 30,
+              "raw": "'row'"
+            },
+            "alignItems": {
+              "line": 48,
+              "col": 22,
+              "endCol": 30,
+              "raw": "'center'"
+            },
+            "height": {
+              "line": 49,
+              "col": 18,
+              "endCol": 20,
+              "raw": "52"
+            },
+            "borderWidth": {
+              "line": 52,
+              "col": 23,
+              "endCol": 24,
+              "raw": "1"
+            },
+            "paddingHorizontal": {
+              "line": 54,
+              "col": 29,
+              "endCol": 31,
+              "raw": "16"
+            },
+            "gap": {
+              "line": 55,
+              "col": 15,
+              "endCol": 17,
+              "raw": "12"
+            },
+            "borderCurve": {
+              "line": 56,
+              "col": 23,
+              "endCol": 35,
+              "raw": "'continuous'"
+            }
+          }
+        }
+      ]
+    },
+    "AuthInput@components/auth-input.tsx:66": {
+      "element": {
+        "file": "components/auth-input.tsx",
+        "line": 66
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "components/auth-input.tsx",
+          "properties": {
+            "flex": {
+              "line": 80,
+              "col": 20,
+              "endCol": 21,
+              "raw": "1"
+            },
+            "fontSize": {
+              "line": 82,
+              "col": 24,
+              "endCol": 26,
+              "raw": "15"
+            },
+            "paddingVertical": {
+              "line": 84,
+              "col": 31,
+              "endCol": 33,
+              "raw": "14"
+            }
+          }
+        },
+        {
+          "origin": "dynamic",
+          "resolvable": false
+        }
+      ]
+    },
+    "AuthInput@components/auth-input.tsx:100": {
+      "element": {
+        "file": "components/auth-input.tsx",
+        "line": 100
+      },
+      "styles": [
+        {
+          "origin": "inline",
+          "file": "components/auth-input.tsx",
+          "properties": {
+            "fontSize": {
+              "line": 100,
+              "col": 60,
+              "endCol": 62,
+              "raw": "12"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -100,6 +100,13 @@ export interface Preferences {
   activityLevel?: string;
   dietPreference?: string;
   workoutPreference?: string;
+  experienceLevel?: string;
+  calorieTarget?: string;
+  proteinTarget?: string;
+  waterTarget?: string;
+  workoutFrequencyGoal?: string;
+  movementGoal?: string;
+  habitPriorities?: string[];
   habits?: string[];
   intentions?: string[];
 }
@@ -114,6 +121,14 @@ export interface OnboardingProfile {
   goal: string;
   activityLevel: string;
   dietPreference: string;
+  workoutPreference: string;
+  experienceLevel: string;
+  calorieTarget: string;
+  proteinTarget: string;
+  waterTarget: string;
+  workoutFrequencyGoal: string;
+  movementGoal: string;
+  habitPriorities: string[];
   habits: string[];
   intentions: string[];
 }

@@ -17,6 +17,7 @@ export default function ProfileScreen() {
   const loadProfile = useAppStore((s) => s.loadProfile);
   const saveProfile = useAppStore((s) => s.saveProfile);
   const resetAll = useAppStore((s) => s.resetAll);
+  const resetOnboardingForTesting = useAppStore((s) => s.resetOnboardingForTesting);
 
   const [form, setForm] = useState({
     name: preferences.name,
@@ -27,6 +28,12 @@ export default function ProfileScreen() {
     activityLevel: preferences.activityLevel ?? '',
     dietPreference: preferences.dietPreference ?? '',
     workoutPreference: preferences.workoutPreference ?? '',
+    experienceLevel: preferences.experienceLevel ?? '',
+    calorieTarget: preferences.calorieTarget ?? '',
+    proteinTarget: preferences.proteinTarget ?? '',
+    waterTarget: preferences.waterTarget ?? '',
+    workoutFrequencyGoal: preferences.workoutFrequencyGoal ?? '',
+    movementGoal: preferences.movementGoal ?? '',
     focusStatement: preferences.focusStatement,
   });
   const [saving, setSaving] = useState(false);
@@ -46,6 +53,12 @@ export default function ProfileScreen() {
       activityLevel: preferences.activityLevel ?? '',
       dietPreference: preferences.dietPreference ?? '',
       workoutPreference: preferences.workoutPreference ?? '',
+      experienceLevel: preferences.experienceLevel ?? '',
+      calorieTarget: preferences.calorieTarget ?? '',
+      proteinTarget: preferences.proteinTarget ?? '',
+      waterTarget: preferences.waterTarget ?? '',
+      workoutFrequencyGoal: preferences.workoutFrequencyGoal ?? '',
+      movementGoal: preferences.movementGoal ?? '',
       focusStatement: preferences.focusStatement,
     });
   }, [preferences]);
@@ -63,6 +76,12 @@ export default function ProfileScreen() {
   };
 
   const logout = async () => {
+    await signOut();
+    resetAll();
+  };
+
+  const resetFlow = async () => {
+    await resetOnboardingForTesting();
     await signOut();
     resetAll();
   };
@@ -145,6 +164,24 @@ export default function ProfileScreen() {
             <TextField label="Activity level" value={form.activityLevel} onChangeText={(activityLevel) => setForm((current) => ({ ...current, activityLevel }))} placeholder="Low, moderate, high" />
             <TextField label="Diet preference" value={form.dietPreference} onChangeText={(dietPreference) => setForm((current) => ({ ...current, dietPreference }))} placeholder="Balanced, vegetarian, high protein..." />
             <TextField label="Workout preference" value={form.workoutPreference} onChangeText={(workoutPreference) => setForm((current) => ({ ...current, workoutPreference }))} placeholder="Gym, home, cardio, walking..." />
+            <TextField label="Experience level" value={form.experienceLevel} onChangeText={(experienceLevel) => setForm((current) => ({ ...current, experienceLevel }))} placeholder="Beginner, intermediate, advanced" />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <TextField label="Calories" value={form.calorieTarget} onChangeText={(calorieTarget) => setForm((current) => ({ ...current, calorieTarget }))} keyboardType="numeric" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <TextField label="Protein" value={form.proteinTarget} onChangeText={(proteinTarget) => setForm((current) => ({ ...current, proteinTarget }))} keyboardType="numeric" />
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <TextField label="Water oz" value={form.waterTarget} onChangeText={(waterTarget) => setForm((current) => ({ ...current, waterTarget }))} keyboardType="numeric" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <TextField label="Workouts/wk" value={form.workoutFrequencyGoal} onChangeText={(workoutFrequencyGoal) => setForm((current) => ({ ...current, workoutFrequencyGoal }))} keyboardType="numeric" />
+              </View>
+            </View>
+            <TextField label="Movement goal" value={form.movementGoal} onChangeText={(movementGoal) => setForm((current) => ({ ...current, movementGoal }))} keyboardType="numeric" />
             <TextField label="Focus statement" value={form.focusStatement} onChangeText={(focusStatement) => setForm((current) => ({ ...current, focusStatement }))} multiline />
             <Button
               title={saved ? 'Saved' : 'Save profile'}
@@ -165,6 +202,7 @@ export default function ProfileScreen() {
               Sign out on this device. Your Supabase-backed meals, workouts, reflections, and profile stay with your account.
             </Typo>
             <Button title="Log out" icon="log-out-outline" variant="destructive" onPress={logout} />
+            <Button title="Reset onboarding test flow" icon="refresh-outline" variant="secondary" onPress={resetFlow} />
           </View>
         </Card>
       </Animated.View>

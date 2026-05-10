@@ -86,7 +86,7 @@ export default function TodayScreen() {
     mealTotals.proteinG,
     nutritionTargets.proteinG
   );
-  const habitPercentage = calculateHabitPercentage(habitsDoneToday, habits.length);
+  const habitPercentage = calculateHabitPercentage(habitsDoneToday, totalHabits);
   const hasWorkoutToday = todayWorkouts.length > 0;
   const hasReflectionToday = moods.some((m) => m.date === today);
   const goalProgress = dashboardSummary.goalProgress;

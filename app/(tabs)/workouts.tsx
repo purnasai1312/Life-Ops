@@ -11,6 +11,8 @@ import { EmptyState } from '@/components/empty-state';
 import { Colors, DisplayFont, Radii } from '@/constants/Theme';
 import { getTodayISO, useAppStore } from '@/store/useAppStore';
 import type { WorkoutLog, WorkoutType } from '@/store/types';
+import { formatShortDate, lastNDates } from '@/utils/date';
+import { getWorkoutSuggestions } from '@/utils/suggestions';
 
 const WORKOUT_TYPES: WorkoutType[] = ['gym', 'home', 'cardio', 'walking', 'rest day'];
 
@@ -25,6 +27,7 @@ const emptyForm = {
 };
 
 export default function WorkoutsScreen() {
+  const preferences = useAppStore((s) => s.preferences);
   const workouts = useAppStore((s) => s.workouts);
   const loadWorkouts = useAppStore((s) => s.loadWorkouts);
   const addWorkout = useAppStore((s) => s.addWorkout);
@@ -34,6 +37,7 @@ export default function WorkoutsScreen() {
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState<WorkoutLog | null>(null);
   const [saving, setSaving] = useState(false);
+  const [range, setRange] = useState<'today' | '7' | '30'>('today');
 
   useEffect(() => {
     loadWorkouts().catch(() => {});
@@ -50,6 +54,16 @@ export default function WorkoutsScreen() {
   );
   const hasRestDay = todayWorkouts.some((workout) => workout.workoutType === 'rest day');
   const completed = todayWorkouts.length > 0;
+  const suggestions = useMemo(() => getWorkoutSuggestions(preferences), [preferences]);
+  const rangeDates = useMemo(
+    () => (range === 'today' ? [today] : lastNDates(range === '7' ? 7 : 30)),
+    [range, today]
+  );
+  const historyWorkouts = useMemo(
+    () => workouts.filter((workout) => rangeDates.includes(workout.date)),
+    [rangeDates, workouts]
+  );
+  const groupedWorkouts = useMemo(() => groupWorkouts(historyWorkouts), [historyWorkouts]);
 
   const reset = () => {
     setForm(emptyForm);
@@ -170,6 +184,45 @@ export default function WorkoutsScreen() {
         </Card>
       </Animated.View>
 
+      {suggestions.length > 0 ? (
+        <Animated.View entering={FadeInDown.delay(125).duration(500)} style={{ gap: 12 }}>
+          <Typo variant="eyebrow" color={Colors.inkMuted}>
+            Suggested for your plan
+          </Typo>
+          <View style={{ gap: 10 }}>
+            {suggestions.map((workout) => (
+              <Card key={workout.title} padding={16}>
+                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Typo variant="bodyEmphasis">{workout.title}</Typo>
+                    <Typo variant="caption" color={Colors.inkMuted}>
+                      {workout.durationMinutes} min · {workout.workoutType}
+                    </Typo>
+                  </View>
+                  <Button
+                    title="Add"
+                    icon="add"
+                    size="sm"
+                    variant="secondary"
+                    onPress={() =>
+                      addWorkout({
+                        workoutType: workout.workoutType,
+                        durationMinutes: workout.durationMinutes,
+                        exerciseName: workout.exerciseName,
+                        sets: workout.sets,
+                        reps: workout.reps,
+                        notes: workout.notes,
+                        date: today,
+                      }).catch(() => {})
+                    }
+                  />
+                </View>
+              </Card>
+            ))}
+          </View>
+        </Animated.View>
+      ) : null}
+
       <Animated.View entering={FadeInDown.delay(150).duration(500)}>
         <Card padding={20}>
           <View style={{ gap: 14 }}>
@@ -227,10 +280,13 @@ export default function WorkoutsScreen() {
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(200).duration(500)} style={{ gap: 12 }}>
-        <Typo variant="eyebrow" color={Colors.inkMuted}>
-          Today&apos;s activity
-        </Typo>
-        {todayWorkouts.length === 0 ? (
+        <View style={{ gap: 10 }}>
+          <Typo variant="eyebrow" color={Colors.inkMuted}>
+            Workout history
+          </Typo>
+          <Segmented options={['today', '7', '30'] as const} value={range} onChange={setRange} />
+        </View>
+        {historyWorkouts.length === 0 ? (
           <EmptyState
             icon="barbell-outline"
             title="No workout logged"
@@ -238,8 +294,18 @@ export default function WorkoutsScreen() {
           />
         ) : (
           <View style={{ gap: 10 }}>
-            {todayWorkouts.map((workout) => (
-              <WorkoutCard key={workout.id} workout={workout} onEdit={startEdit} onDelete={remove} />
+            {groupedWorkouts.map((group) => (
+              <Card key={group.date} padding={0}>
+                <View style={{ padding: 16, gap: 4, borderBottomWidth: 1, borderBottomColor: Colors.borderSoft }}>
+                  <Typo variant="bodyEmphasis">{group.date === today ? 'Today' : formatShortDate(group.date)}</Typo>
+                  <Typo variant="caption" color={Colors.inkMuted}>
+                    {group.durationMinutes} minutes · {group.items.length} {group.items.length === 1 ? 'entry' : 'entries'}
+                  </Typo>
+                </View>
+                {group.items.map((workout) => (
+                  <WorkoutCard key={workout.id} workout={workout} onEdit={startEdit} onDelete={remove} flat />
+                ))}
+              </Card>
             ))}
           </View>
         )}
@@ -248,7 +314,7 @@ export default function WorkoutsScreen() {
   );
 }
 
-function Segmented<T extends string>({ options, value, onChange }: { options: T[]; value: T; onChange: (value: T) => void }) {
+function Segmented<T extends string>({ options, value, onChange }: { options: readonly T[]; value: T; onChange: (value: T) => void }) {
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
       {options.map((option) => {
@@ -275,43 +341,59 @@ function Segmented<T extends string>({ options, value, onChange }: { options: T[
   );
 }
 
-function WorkoutCard({ workout, onEdit, onDelete }: { workout: WorkoutLog; onEdit: (workout: WorkoutLog) => void; onDelete: (workout: WorkoutLog) => void }) {
+function WorkoutCard({ workout, onEdit, onDelete, flat }: { workout: WorkoutLog; onEdit: (workout: WorkoutLog) => void; onDelete: (workout: WorkoutLog) => void; flat?: boolean }) {
+  const content = (
+    <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+      <View
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: 18,
+          backgroundColor: Colors.forestSoft,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Ionicons name={workout.workoutType === 'rest day' ? 'bed-outline' : 'barbell-outline'} size={20} color={Colors.forest} />
+      </View>
+      <View style={{ flex: 1, gap: 4 }}>
+        <Typo variant="bodyEmphasis">{workout.workoutType}</Typo>
+        <Typo variant="caption" color={Colors.inkMuted}>
+          {workout.durationMinutes} min{workout.exerciseName ? ` · ${workout.exerciseName}` : ''}
+        </Typo>
+        {workout.sets || workout.reps || workout.weight ? (
+          <Typo variant="caption">
+            {[workout.sets ? `${workout.sets} sets` : null, workout.reps ? `${workout.reps} reps` : null, workout.weight ? `${workout.weight} lb` : null]
+              .filter(Boolean)
+              .join(' · ')}
+          </Typo>
+        ) : null}
+        {workout.notes ? <Typo variant="caption">{workout.notes}</Typo> : null}
+      </View>
+      <Pressable onPress={() => onEdit(workout)} hitSlop={8} style={{ padding: 4 }}>
+        <Ionicons name="create-outline" size={18} color={Colors.inkMuted} />
+      </Pressable>
+      <Pressable onPress={() => onDelete(workout)} hitSlop={8} style={{ padding: 4 }}>
+        <Ionicons name="trash-outline" size={18} color={Colors.inkMuted} />
+      </Pressable>
+    </View>
+  );
+  if (flat) return <View style={{ padding: 16 }}>{content}</View>;
   return (
     <Card padding={18}>
-      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-        <View
-          style={{
-            width: 42,
-            height: 42,
-            borderRadius: 18,
-            backgroundColor: Colors.forestSoft,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Ionicons name={workout.workoutType === 'rest day' ? 'bed-outline' : 'barbell-outline'} size={20} color={Colors.forest} />
-        </View>
-        <View style={{ flex: 1, gap: 4 }}>
-          <Typo variant="bodyEmphasis">{workout.workoutType}</Typo>
-          <Typo variant="caption" color={Colors.inkMuted}>
-            {workout.durationMinutes} min{workout.exerciseName ? ` · ${workout.exerciseName}` : ''}
-          </Typo>
-          {workout.sets || workout.reps || workout.weight ? (
-            <Typo variant="caption">
-              {[workout.sets ? `${workout.sets} sets` : null, workout.reps ? `${workout.reps} reps` : null, workout.weight ? `${workout.weight} lb` : null]
-                .filter(Boolean)
-                .join(' · ')}
-            </Typo>
-          ) : null}
-          {workout.notes ? <Typo variant="caption">{workout.notes}</Typo> : null}
-        </View>
-        <Pressable onPress={() => onEdit(workout)} hitSlop={8} style={{ padding: 4 }}>
-          <Ionicons name="create-outline" size={18} color={Colors.inkMuted} />
-        </Pressable>
-        <Pressable onPress={() => onDelete(workout)} hitSlop={8} style={{ padding: 4 }}>
-          <Ionicons name="trash-outline" size={18} color={Colors.inkMuted} />
-        </Pressable>
-      </View>
+      {content}
     </Card>
   );
+}
+
+function groupWorkouts(workouts: WorkoutLog[]) {
+  const map = new Map<string, WorkoutLog[]>();
+  for (const workout of workouts) map.set(workout.date, [...(map.get(workout.date) ?? []), workout]);
+  return [...map.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([date, items]) => ({
+      date,
+      items,
+      durationMinutes: items.reduce((sum, workout) => sum + workout.durationMinutes, 0),
+    }));
 }

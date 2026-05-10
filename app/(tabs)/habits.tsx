@@ -1,4 +1,5 @@
 import { View, Pressable, Alert, Platform } from 'react-native';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -20,9 +21,30 @@ export default function HabitsScreen() {
   const habits = useAppStore((s) => s.habits);
   const toggleHabitToday = useAppStore((s) => s.toggleHabitToday);
   const deleteHabit = useAppStore((s) => s.deleteHabit);
+  const [range, setRange] = useState<'today' | '7' | '30'>('7');
 
   const today = getTodayISO();
   const week = lastNDates(7);
+  const historyDates = useMemo(
+    () => (range === 'today' ? [today] : lastNDates(range === '7' ? 7 : 30)),
+    [range, today]
+  );
+  const habitHistory = useMemo(
+    () =>
+      historyDates
+        .map((date) => {
+          const completed = habits.filter((habit) => habit.completions[date]).length;
+          const total = habits.length;
+          return {
+            date,
+            completed,
+            total,
+            percent: total > 0 ? Math.round((completed / total) * 100) : 0,
+          };
+        })
+        .reverse(),
+    [habits, historyDates]
+  );
 
   const handleDelete = (id: string, title: string) => {
     if (Platform.OS === 'web') {
@@ -115,6 +137,24 @@ export default function HabitsScreen() {
         />
       ) : (
         <View style={{ gap: 12 }}>
+          <Card padding={18}>
+            <View style={{ gap: 12 }}>
+              <Typo variant="eyebrow" color={Colors.inkMuted}>
+                Habit history
+              </Typo>
+              <Segmented options={['today', '7', '30'] as const} value={range} onChange={setRange} />
+              {habitHistory.map((day) => (
+                <View key={day.date} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typo variant="caption" color={Colors.inkMuted}>
+                    {day.date === today ? 'Today' : day.date}
+                  </Typo>
+                  <Typo variant="bodyEmphasis">
+                    {day.completed}/{day.total} · {day.percent}%
+                  </Typo>
+                </View>
+              ))}
+            </View>
+          </Card>
           {habits.map((h, i) => {
             const pair = accentPair(h.color);
             const doneToday = !!h.completions[today];
@@ -283,6 +323,33 @@ export default function HabitsScreen() {
         </View>
       )}
     </Screen>
+  );
+}
+
+function Segmented<T extends string>({ options, value, onChange }: { options: readonly T[]; value: T; onChange: (value: T) => void }) {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+      {options.map((option) => {
+        const active = option === value;
+        return (
+          <Pressable
+            key={option}
+            onPress={() => onChange(option)}
+            style={({ pressed }) => ({
+              paddingHorizontal: 12,
+              paddingVertical: 9,
+              borderRadius: Radii.pill,
+              backgroundColor: active ? Colors.ink : Colors.surfaceMuted,
+              opacity: pressed ? 0.75 : 1,
+            })}
+          >
+            <Typo variant="label" color={active ? Colors.bgElevated : Colors.inkSoft}>
+              {option}
+            </Typo>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 

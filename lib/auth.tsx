@@ -1,8 +1,10 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import * as WebBrowser from 'expo-web-browser';
 import type { AuthError, Provider, Session, User } from '@supabase/supabase-js';
+import { getOAuthRedirectUri } from './auth-routing';
 import { supabase } from './supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -94,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithOAuth = async (provider: Provider) => {
     await runAuth(async () => {
-      const redirectTo = Linking.createURL('auth/callback');
+      const redirectTo = getOAuthRedirectUri();
       const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
@@ -106,19 +108,104 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!data.url) throw new Error('Unable to start OAuth sign in.');
 
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-      if (result.type !== 'success') return;
+      if (result.type === 'cancel' || result.type === 'dismiss') {
+        throw new Error('Sign in was cancelled.');
+      }
+      if (result.type !== 'success') {
+        throw new Error('Sign in did not complete. Please try again.');
+      }
 
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(
-        result.url
-      );
+      const fragment = result.url.includes('#') ? result.url.split('#')[1] : '';
+      const hashParams = new URLSearchParams(fragment);
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+
+      if (accessToken && refreshToken) {
+        const { data: sessionData, error: setSessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (setSessionError) throw setSessionError;
+        setSession(sessionData.session);
+        return;
+      }
+
+      const { data: sessionData, error: exchangeError } =
+        await supabase.auth.exchangeCodeForSession(result.url);
       if (exchangeError) throw exchangeError;
+      setSession(sessionData.session);
+    });
+  };
+
+  const signInWithApple = async () => {
+    await runAuth(async () => {
+      if (Platform.OS !== 'ios') {
+        throw new Error('Apple sign in is available on iOS devices.');
+      }
+
+      const isAvailable = await AppleAuthentication.isAvailableAsync();
+      if (!isAvailable) {
+        throw new Error('Apple sign in is not available on this device.');
+      }
+
+      let credential: AppleAuthentication.AppleAuthenticationCredential;
+      try {
+        credential = await AppleAuthentication.signInAsync({
+          requestedScopes: [
+            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+            AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          ],
+        });
+      } catch (appleError) {
+        if ((appleError as { code?: string }).code === 'ERR_REQUEST_CANCELED') {
+          throw new Error('Apple sign in was cancelled.');
+        }
+        throw new Error('Apple sign in failed. Please try again.');
+      }
+
+      if (!credential.identityToken) {
+        throw new Error('Apple did not return an identity token. Please try again.');
+      }
+
+      const { data, error: appleSignInError } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+      });
+      if (appleSignInError) throw appleSignInError;
+      setSession(data.session);
+
+      const userId = data.user?.id;
+      if (!userId) return;
+
+      const appleName = [
+        credential.fullName?.givenName,
+        credential.fullName?.familyName,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      const email = credential.email ?? data.user.email ?? null;
+
+      if (appleName || email) {
+        const { error: profileError } = await supabase.from('profiles').upsert(
+          {
+            id: userId,
+            email,
+            name: appleName || data.user.user_metadata?.name || null,
+          },
+          { onConflict: 'id' }
+        );
+        if (profileError) {
+          if (__DEV__) console.info('[Auth] Unable to save Apple profile details:', profileError.message);
+        }
+      }
     });
   };
 
   const resetPassword = async (email: string) => {
     await runAuth(async () => {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: Linking.createURL('auth/callback'),
+        redirectTo: getOAuthRedirectUri(),
       });
       if (resetError) throw resetError;
       setPendingPasswordReset(true);
@@ -144,7 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithEmail,
       signUpWithEmail,
       signInWithGoogle: () => signInWithOAuth('google'),
-      signInWithApple: () => signInWithOAuth('apple'),
+      signInWithApple,
       resetPassword,
       signOut,
     }),

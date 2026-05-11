@@ -22,6 +22,7 @@ import { Typo } from '@/components/typography';
 import { Colors, DisplayFont, Radii } from '@/constants/Theme';
 import { isMissingSupabaseTableError, supabase } from '@/lib/supabase';
 import { getDefaultTargets, useAppStore } from '@/store/useAppStore';
+import { getSuggestedGoalTemplates } from '@/utils/goals';
 
 const INTENTIONS = [
   { key: 'clarity', label: 'Find clarity', icon: 'compass-outline' },
@@ -34,8 +35,8 @@ const INTENTIONS = [
 
 const GOALS = ['Lose weight', 'Gain muscle', 'Maintain', 'Feel healthier'];
 const ACTIVITY = ['Light', 'Moderate', 'Active', 'Very active'];
-const DIETS = ['Flexible', 'Vegetarian', 'Vegan', 'Mediterranean', 'High protein'];
-const WORKOUTS = ['Gym', 'Home', 'Walking', 'Mixed'];
+const DIETS = ['Omnivore', 'Vegetarian', 'Vegan', 'Pescatarian', 'No preference'];
+const WORKOUTS = ['Gym', 'Home', 'Walking', 'Running', 'Yoga/mobility', 'Mixed'];
 const EXPERIENCE = ['Beginner', 'Intermediate', 'Advanced'];
 const HABITS = ['Walk daily', 'Drink water', 'Sleep earlier', 'Journal', 'Stretch', 'Plan meals', 'Protein each meal', 'Prep tomorrow'];
 
@@ -44,6 +45,7 @@ export default function Onboarding() {
   const insets = useSafeAreaInsets();
   const { isAuthenticated, isLoading, user } = useAuth();
   const completeOnboarding = useAppStore((s) => s.completeOnboarding);
+  const addGoalTemplates = useAppStore((s) => s.addGoalTemplates);
   const preferences = useAppStore((s) => s.preferences);
 
   const metadataName = useMemo(() => {
@@ -59,7 +61,9 @@ export default function Onboarding() {
   const [goal, setGoal] = useState(preferences.goal ?? '');
   const [activityLevel, setActivityLevel] = useState(preferences.activityLevel ?? '');
   const [dietPreference, setDietPreference] = useState(preferences.dietPreference ?? '');
-  const [workoutPreference, setWorkoutPreference] = useState(preferences.workoutPreference ?? '');
+  const [workoutPreferences, setWorkoutPreferences] = useState<string[]>(
+    preferences.workoutPreferences ?? (preferences.workoutPreference ? [preferences.workoutPreference] : [])
+  );
   const [experienceLevel, setExperienceLevel] = useState(preferences.experienceLevel ?? '');
   const [calorieTarget, setCalorieTarget] = useState(preferences.calorieTarget ?? '');
   const [proteinTarget, setProteinTarget] = useState(preferences.proteinTarget ?? '');
@@ -68,6 +72,7 @@ export default function Onboarding() {
   const [movementGoal, setMovementGoal] = useState(preferences.movementGoal ?? '');
   const [habits, setHabits] = useState<string[]>(preferences.habits ?? []);
   const [habitPriorities, setHabitPriorities] = useState<string[]>(preferences.habitPriorities ?? preferences.habits ?? []);
+  const [selectedGoals, setSelectedGoals] = useState<string[]>(preferences.selectedGoals ?? []);
   const [intentions, setIntentions] = useState<string[]>(preferences.intentions ?? []);
   const [focusStatement, setFocusStatement] = useState(preferences.focusStatement ?? '');
   const [saving, setSaving] = useState(false);
@@ -108,29 +113,34 @@ export default function Onboarding() {
     (!user?.id || !preferences.userId || preferences.userId === user.id) &&
     Boolean(preferences.name?.trim()) &&
     Boolean(preferences.goal) &&
-    Boolean(preferences.workoutPreference) &&
+    Boolean(preferences.workoutPreferences?.length || preferences.workoutPreference) &&
     Boolean(preferences.experienceLevel) &&
     Boolean(preferences.calorieTarget) &&
     Boolean(preferences.proteinTarget);
+
+  if (isLoading) {
+    return null;
+  }
 
   if (onboardedForThisUser) {
     return <Redirect href="/(tabs)" />;
   }
 
-  if (!isLoading && !isAuthenticated) {
+  if (!isAuthenticated) {
     return <Redirect href="/(auth)/login" />;
   }
 
-  const totalSteps = 8;
+  const totalSteps = 9;
   const canNext = Boolean(
     (step === 0 && name.trim().length > 0) ||
     (step === 1 && age.trim() && height.trim() && weight.trim()) ||
     (step === 2 && goal && activityLevel) ||
-    (step === 3 && dietPreference && workoutPreference && experienceLevel) ||
+    (step === 3 && dietPreference && workoutPreferences.length > 0 && experienceLevel) ||
     (step === 4 && calorieTarget && proteinTarget && waterTarget && workoutFrequencyGoal && movementGoal) ||
-    (step === 5 && habitPriorities.length > 0) ||
-    (step === 6 && intentions.length > 0) ||
-    (step === 7 && focusStatement.trim().length > 0)
+    (step === 5 && selectedGoals.length > 0) ||
+    (step === 6 && habitPriorities.length > 0) ||
+    (step === 7 && intentions.length > 0) ||
+    (step === 8 && focusStatement.trim().length > 0)
   );
 
   const toggle = (value: string, setter: (next: string[]) => void, current: string[]) => {
@@ -148,7 +158,8 @@ export default function Onboarding() {
       goal,
       activity_level: activityLevel,
       diet_preference: dietPreference,
-      workout_preference: workoutPreference,
+      workout_preference: workoutPreferences[0] ?? null,
+      workout_preferences: workoutPreferences,
       experience_level: experienceLevel,
       calorie_target: Number(calorieTarget) || null,
       protein_target: Number(proteinTarget) || null,
@@ -156,6 +167,7 @@ export default function Onboarding() {
       workout_frequency_goal: Number(workoutFrequencyGoal) || null,
       movement_goal: Number(movementGoal) || null,
       habit_priorities: habitPriorities,
+      selected_goals: selectedGoals,
       habits,
       intentions,
       focus_statement: focusStatement.trim(),
@@ -170,7 +182,8 @@ export default function Onboarding() {
       goal,
       activity_level: activityLevel,
       diet_preference: dietPreference,
-      workout_preference: workoutPreference,
+      workout_preference: workoutPreferences[0] ?? null,
+      workout_preferences: workoutPreferences,
       experience_level: experienceLevel,
       calorie_target: Number(calorieTarget) || null,
       protein_target: Number(proteinTarget) || null,
@@ -178,6 +191,7 @@ export default function Onboarding() {
       workout_frequency_goal: Number(workoutFrequencyGoal) || null,
       movement_goal: Number(movementGoal) || null,
       habit_priorities: habitPriorities,
+      selected_goals: selectedGoals,
       habits,
       intentions,
       focus_statement: focusStatement.trim(),
@@ -213,7 +227,8 @@ export default function Onboarding() {
       goal,
       activityLevel,
       dietPreference,
-      workoutPreference,
+      workoutPreference: workoutPreferences[0] ?? '',
+      workoutPreferences,
       experienceLevel,
       calorieTarget,
       proteinTarget,
@@ -221,12 +236,22 @@ export default function Onboarding() {
       workoutFrequencyGoal,
       movementGoal,
       habitPriorities,
+      selectedGoals,
       habits,
       intentions,
       focusStatement,
     });
     try {
       await saveProfileToSupabase();
+      const templates = getSuggestedGoalTemplates({
+        goal,
+        proteinTarget,
+        calorieTarget,
+        waterTarget,
+        movementGoal,
+        workoutFrequencyGoal,
+      }).filter((template) => selectedGoals.includes(template.key));
+      await addGoalTemplates(templates);
     } catch {
       // Local onboarding is still persisted; remote profile can sync later.
     } finally {
@@ -321,8 +346,12 @@ export default function Onboarding() {
                     <Title eyebrow="Preferences" title="Food and movement," accent="your way." />
                     <Typo variant="eyebrow" color={Colors.inkMuted}>Diet preference</Typo>
                     <OptionGrid options={DIETS} selected={[dietPreference]} onPress={setDietPreference} />
-                    <Typo variant="eyebrow" color={Colors.inkMuted}>Workout preference</Typo>
-                    <OptionGrid options={WORKOUTS} selected={[workoutPreference]} onPress={setWorkoutPreference} />
+                    <Typo variant="eyebrow" color={Colors.inkMuted}>Workout preferences</Typo>
+                    <OptionGrid
+                      options={WORKOUTS}
+                      selected={workoutPreferences}
+                      onPress={(value) => toggle(value, setWorkoutPreferences, workoutPreferences)}
+                    />
                     <Typo variant="eyebrow" color={Colors.inkMuted}>Experience level</Typo>
                     <OptionGrid options={EXPERIENCE} selected={[experienceLevel]} onPress={setExperienceLevel} />
                   </>
@@ -344,6 +373,34 @@ export default function Onboarding() {
 
                 {step === 5 ? (
                   <>
+                    <Title eyebrow="Goals" title="Choose the goals" accent="to enable." />
+                    <Typo variant="body">These create your first real goal records. You can add or remove them later.</Typo>
+                    <View style={{ gap: 10 }}>
+                      {getSuggestedGoalTemplates({
+                        goal,
+                        proteinTarget,
+                        calorieTarget,
+                        waterTarget,
+                        movementGoal,
+                        workoutFrequencyGoal,
+                      }).map((template) => {
+                        const active = selectedGoals.includes(template.key);
+                        return (
+                          <Pill
+                            key={template.key}
+                            label={`${template.title} · ${template.target} ${template.unit}`}
+                            icon="checkmark-circle-outline"
+                            active={active}
+                            onPress={() => toggle(template.key, setSelectedGoals, selectedGoals)}
+                          />
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : null}
+
+                {step === 6 ? (
+                  <>
                     <Title eyebrow="Priorities" title="Pick the habits" accent="to tend." />
                     <Typo variant="body">These shape reminders, empty states, and quick prompts.</Typo>
                     <OptionGrid
@@ -357,7 +414,7 @@ export default function Onboarding() {
                   </>
                 ) : null}
 
-                {step === 6 ? (
+                {step === 7 ? (
                   <>
                     <Title eyebrow="Intention" title="What do you want" accent="more of?" />
                     <Typo variant="body">Choose a few. This shapes your empty states and daily prompts.</Typo>
@@ -378,7 +435,7 @@ export default function Onboarding() {
                   </>
                 ) : null}
 
-                {step === 7 ? (
+                {step === 8 ? (
                   <>
                     <Title eyebrow="Compass" title="One sentence to" accent="guide the season." />
                     <Typo variant="body">A quiet north star for your dashboard and daily reset.</Typo>
@@ -513,7 +570,11 @@ function Pill({
         opacity: pressed ? 0.75 : 1,
       })}
     >
-      {icon ? <Ionicons name={icon} size={16} color={active ? Colors.bgElevated : Colors.inkSoft} /> : null}
+      <Ionicons
+        name={active ? 'checkmark-circle-outline' : icon ?? 'ellipse-outline'}
+        size={16}
+        color={active ? Colors.bgElevated : Colors.inkSoft}
+      />
       <Typo variant="bodyEmphasis" color={active ? Colors.bgElevated : Colors.ink} style={{ fontSize: 14 }}>
         {label}
       </Typo>

@@ -25,6 +25,7 @@ create table if not exists public.profiles (
   activity_level text,
   diet_preference text,
   workout_preference text,
+  workout_preferences text[] not null default '{}',
   experience_level text,
   calorie_target integer check (calorie_target is null or calorie_target > 0),
   protein_target integer check (protein_target is null or protein_target > 0),
@@ -32,6 +33,7 @@ create table if not exists public.profiles (
   workout_frequency_goal integer check (workout_frequency_goal is null or workout_frequency_goal >= 0),
   movement_goal integer check (movement_goal is null or movement_goal >= 0),
   habit_priorities text[] not null default '{}',
+  selected_goals text[] not null default '{}',
   habits text[] not null default '{}',
   intentions text[] not null default '{}',
   focus_statement text,
@@ -52,6 +54,7 @@ create table if not exists public.onboarding (
   activity_level text,
   diet_preference text,
   workout_preference text,
+  workout_preferences text[] not null default '{}',
   experience_level text,
   calorie_target integer check (calorie_target is null or calorie_target > 0),
   protein_target integer check (protein_target is null or protein_target > 0),
@@ -59,6 +62,7 @@ create table if not exists public.onboarding (
   workout_frequency_goal integer check (workout_frequency_goal is null or workout_frequency_goal >= 0),
   movement_goal integer check (movement_goal is null or movement_goal >= 0),
   habit_priorities text[] not null default '{}',
+  selected_goals text[] not null default '{}',
   habits text[] not null default '{}',
   intentions text[] not null default '{}',
   focus_statement text,
@@ -84,6 +88,8 @@ create table if not exists public.goals (
   title text not null,
   description text,
   color text,
+  category text not null default 'custom' check (category in ('nutrition', 'workout', 'movement', 'sleep', 'hydration', 'mindfulness', 'recovery', 'cardio', 'strength', 'mobility', 'custom')),
+  target_unit text not null default 'count',
   target integer not null default 1 check (target > 0),
   progress integer not null default 0 check (progress >= 0),
   due_date date,
@@ -217,6 +223,25 @@ create table if not exists public.daily_scores (
   unique (user_id, score_date)
 );
 
+create table if not exists public.daily_activity (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  date date not null default current_date,
+  source text not null default 'manual' check (source in ('apple_health', 'health_connect', 'google_fit', 'manual')),
+  steps integer not null default 0 check (steps >= 0),
+  calories_burned integer not null default 0 check (calories_burned >= 0),
+  active_minutes integer not null default 0 check (active_minutes >= 0),
+  exercise_minutes integer not null default 0 check (exercise_minutes >= 0),
+  distance_meters integer not null default 0 check (distance_meters >= 0),
+  workouts_count integer not null default 0 check (workouts_count >= 0),
+  sleep_minutes integer check (sleep_minutes is null or sleep_minutes >= 0),
+  avg_heart_rate integer check (avg_heart_rate is null or avg_heart_rate >= 0),
+  synced_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, date, source)
+);
+
 create table if not exists public.weekly_summaries (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -247,6 +272,7 @@ create index if not exists habit_logs_user_date_idx on public.habit_logs(user_id
 create index if not exists habit_logs_habit_id_idx on public.habit_logs(habit_id);
 create index if not exists reflections_user_date_idx on public.reflections(user_id, reflection_date desc);
 create index if not exists daily_scores_user_date_idx on public.daily_scores(user_id, score_date desc);
+create index if not exists daily_activity_user_date_idx on public.daily_activity(user_id, date desc);
 create index if not exists weekly_summaries_user_week_idx on public.weekly_summaries(user_id, week_start_date desc);
 
 do $$
@@ -266,6 +292,7 @@ begin
     'habit_logs',
     'reflections',
     'daily_scores',
+    'daily_activity',
     'weekly_summaries'
   ]
   loop
@@ -317,6 +344,7 @@ alter table public.habits enable row level security;
 alter table public.habit_logs enable row level security;
 alter table public.reflections enable row level security;
 alter table public.daily_scores enable row level security;
+alter table public.daily_activity enable row level security;
 alter table public.weekly_summaries enable row level security;
 
 drop policy if exists "profiles_select_own" on public.profiles;
@@ -426,6 +454,15 @@ create policy "daily_scores_select_own" on public.daily_scores for select to aut
 create policy "daily_scores_insert_own" on public.daily_scores for insert to authenticated with check (user_id = auth.uid());
 create policy "daily_scores_update_own" on public.daily_scores for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy "daily_scores_delete_own" on public.daily_scores for delete to authenticated using (user_id = auth.uid());
+
+drop policy if exists "daily_activity_select_own" on public.daily_activity;
+drop policy if exists "daily_activity_insert_own" on public.daily_activity;
+drop policy if exists "daily_activity_update_own" on public.daily_activity;
+drop policy if exists "daily_activity_delete_own" on public.daily_activity;
+create policy "daily_activity_select_own" on public.daily_activity for select to authenticated using (user_id = auth.uid());
+create policy "daily_activity_insert_own" on public.daily_activity for insert to authenticated with check (user_id = auth.uid());
+create policy "daily_activity_update_own" on public.daily_activity for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "daily_activity_delete_own" on public.daily_activity for delete to authenticated using (user_id = auth.uid());
 
 drop policy if exists "weekly_summaries_select_own" on public.weekly_summaries;
 drop policy if exists "weekly_summaries_insert_own" on public.weekly_summaries;

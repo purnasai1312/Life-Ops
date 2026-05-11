@@ -27,7 +27,7 @@ export default function ProfileScreen() {
     goal: preferences.goal ?? '',
     activityLevel: preferences.activityLevel ?? '',
     dietPreference: preferences.dietPreference ?? '',
-    workoutPreference: preferences.workoutPreference ?? '',
+    workoutPreferences: (preferences.workoutPreferences ?? (preferences.workoutPreference ? [preferences.workoutPreference] : [])).join(', '),
     experienceLevel: preferences.experienceLevel ?? '',
     calorieTarget: preferences.calorieTarget ?? '',
     proteinTarget: preferences.proteinTarget ?? '',
@@ -52,7 +52,7 @@ export default function ProfileScreen() {
       goal: preferences.goal ?? '',
       activityLevel: preferences.activityLevel ?? '',
       dietPreference: preferences.dietPreference ?? '',
-      workoutPreference: preferences.workoutPreference ?? '',
+      workoutPreferences: (preferences.workoutPreferences ?? (preferences.workoutPreference ? [preferences.workoutPreference] : [])).join(', '),
       experienceLevel: preferences.experienceLevel ?? '',
       calorieTarget: preferences.calorieTarget ?? '',
       proteinTarget: preferences.proteinTarget ?? '',
@@ -67,7 +67,11 @@ export default function ProfileScreen() {
     setSaving(true);
     setSaved(false);
     try {
-      await saveProfile(form);
+      await saveProfile({
+        ...form,
+        workoutPreference: form.workoutPreferences.split(',').map((item) => item.trim()).filter(Boolean)[0] ?? '',
+        workoutPreferences: form.workoutPreferences.split(',').map((item) => item.trim()).filter(Boolean),
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 1600);
     } finally {
@@ -163,7 +167,7 @@ export default function ProfileScreen() {
             <TextField label="Goal" value={form.goal} onChangeText={(goal) => setForm((current) => ({ ...current, goal }))} placeholder="Maintain energy, lose weight, build muscle..." />
             <TextField label="Activity level" value={form.activityLevel} onChangeText={(activityLevel) => setForm((current) => ({ ...current, activityLevel }))} placeholder="Low, moderate, high" />
             <TextField label="Diet preference" value={form.dietPreference} onChangeText={(dietPreference) => setForm((current) => ({ ...current, dietPreference }))} placeholder="Balanced, vegetarian, high protein..." />
-            <TextField label="Workout preference" value={form.workoutPreference} onChangeText={(workoutPreference) => setForm((current) => ({ ...current, workoutPreference }))} placeholder="Gym, home, cardio, walking..." />
+            <TextField label="Workout preferences" value={form.workoutPreferences} onChangeText={(workoutPreferences) => setForm((current) => ({ ...current, workoutPreferences }))} placeholder="Gym, home, walking, running..." />
             <TextField label="Experience level" value={form.experienceLevel} onChangeText={(experienceLevel) => setForm((current) => ({ ...current, experienceLevel }))} placeholder="Beginner, intermediate, advanced" />
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <View style={{ flex: 1 }}>

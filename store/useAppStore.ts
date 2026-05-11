@@ -6,6 +6,9 @@ import type {
   Habit,
   Task,
   Goal,
+  GoalCategory,
+  GoalUnit,
+  DailyActivitySummary,
   MoodEntry,
   MealEntry,
   MealType,
@@ -17,6 +20,8 @@ import type {
   HabitCadence,
   MoodValue,
 } from './types';
+import type { GoalTemplate } from '@/utils/goals';
+import * as healthSync from '@/healthSync';
 
 const todayISO = () => {
   const d = new Date();
@@ -66,7 +71,7 @@ const isProfileComplete = (preferences: Preferences) =>
       preferences.goal?.trim() &&
       preferences.activityLevel?.trim() &&
       preferences.dietPreference?.trim() &&
-      preferences.workoutPreference?.trim() &&
+      (preferences.workoutPreferences?.length || preferences.workoutPreference?.trim()) &&
       preferences.experienceLevel?.trim() &&
       preferences.calorieTarget &&
       preferences.proteinTarget &&
@@ -86,6 +91,7 @@ interface AppState {
   moods: MoodEntry[];
   meals: MealEntry[];
   workouts: WorkoutLog[];
+  dailyActivity: DailyActivitySummary[];
   dashboardSummary: {
     completedHabits: number;
     totalHabits: number;
@@ -123,11 +129,15 @@ interface AppState {
     title: string;
     description?: string;
     color: AccentColor;
+    category?: GoalCategory;
+    unit?: GoalUnit;
     target: number;
     dueDate?: string;
-  }) => void;
-  incrementGoal: (goalId: string, delta: number) => void;
-  deleteGoal: (goalId: string) => void;
+  }) => Promise<void>;
+  addGoalTemplates: (templates: GoalTemplate[]) => Promise<void>;
+  loadGoals: () => Promise<void>;
+  incrementGoal: (goalId: string, delta: number) => Promise<void>;
+  deleteGoal: (goalId: string) => Promise<void>;
 
   // Mood
   loadReflections: () => Promise<void>;
@@ -164,6 +174,9 @@ interface AppState {
   deleteWorkout: (id: string) => Promise<void>;
 
   loadDashboardSummary: () => Promise<void>;
+  loadDailyActivity: () => Promise<void>;
+  saveDailyActivity: (activity: DailyActivitySummary) => Promise<void>;
+  syncDailyActivity: (date?: string) => Promise<void>;
   loadCoreData: () => Promise<void>;
 }
 
@@ -210,6 +223,7 @@ export const useAppStore = create<AppState>()(
       moods: [],
       meals: [],
       workouts: [],
+      dailyActivity: [],
       dashboardSummary: {
         completedHabits: 0,
         totalHabits: 0,
@@ -231,6 +245,7 @@ export const useAppStore = create<AppState>()(
             activityLevel: profile.activityLevel,
             dietPreference: profile.dietPreference,
             workoutPreference: profile.workoutPreference,
+            workoutPreferences: profile.workoutPreferences,
             experienceLevel: profile.experienceLevel,
             calorieTarget: profile.calorieTarget,
             proteinTarget: profile.proteinTarget,
@@ -238,6 +253,7 @@ export const useAppStore = create<AppState>()(
             workoutFrequencyGoal: profile.workoutFrequencyGoal,
             movementGoal: profile.movementGoal,
             habitPriorities: profile.habitPriorities,
+            selectedGoals: profile.selectedGoals,
             habits: profile.habits,
             intentions: profile.intentions,
             hasCompletedOnboarding: true,
@@ -256,7 +272,7 @@ export const useAppStore = create<AppState>()(
           const { data, error } = await supabase
             .from('profiles')
             .select(
-              'id,name,age,height,weight,goal,activity_level,diet_preference,workout_preference,experience_level,calorie_target,protein_target,water_target,workout_frequency_goal,movement_goal,habit_priorities,habits,intentions,focus_statement,has_completed_onboarding,notifications_enabled,week_starts_on_monday'
+              'id,name,age,height,weight,goal,activity_level,diet_preference,workout_preference,workout_preferences,experience_level,calorie_target,protein_target,water_target,workout_frequency_goal,movement_goal,habit_priorities,selected_goals,habits,intentions,focus_statement,has_completed_onboarding,notifications_enabled,week_starts_on_monday'
             )
             .eq('id', userId)
             .maybeSingle();
@@ -275,6 +291,7 @@ export const useAppStore = create<AppState>()(
               moods: state.preferences.userId === userId ? state.moods : [],
               meals: state.preferences.userId === userId ? state.meals : [],
               workouts: state.preferences.userId === userId ? state.workouts : [],
+              dailyActivity: state.preferences.userId === userId ? state.dailyActivity : [],
             }));
             return;
           }
@@ -290,6 +307,7 @@ export const useAppStore = create<AppState>()(
               activityLevel: data.activity_level ?? undefined,
               dietPreference: data.diet_preference ?? undefined,
               workoutPreference: data.workout_preference ?? undefined,
+              workoutPreferences: data.workout_preferences ?? (data.workout_preference ? [data.workout_preference] : undefined),
               experienceLevel: data.experience_level ?? undefined,
               calorieTarget: data.calorie_target == null ? undefined : String(data.calorie_target),
               proteinTarget: data.protein_target == null ? undefined : String(data.protein_target),
@@ -297,6 +315,7 @@ export const useAppStore = create<AppState>()(
               workoutFrequencyGoal: data.workout_frequency_goal == null ? undefined : String(data.workout_frequency_goal),
               movementGoal: data.movement_goal == null ? undefined : String(data.movement_goal),
               habitPriorities: data.habit_priorities ?? undefined,
+              selectedGoals: data.selected_goals ?? undefined,
               habits: data.habits ?? undefined,
               intentions: data.intentions ?? undefined,
               focusStatement: data.focus_statement ?? '',
@@ -310,6 +329,7 @@ export const useAppStore = create<AppState>()(
             moods: state.preferences.userId && state.preferences.userId !== userId ? [] : state.moods,
             meals: state.preferences.userId && state.preferences.userId !== userId ? [] : state.meals,
             workouts: state.preferences.userId && state.preferences.userId !== userId ? [] : state.workouts,
+            dailyActivity: state.preferences.userId && state.preferences.userId !== userId ? [] : state.dailyActivity,
           }));
         } catch (error) {
           if (!isMissingSupabaseTableError(error)) {
@@ -336,6 +356,7 @@ export const useAppStore = create<AppState>()(
             activity_level: next.activityLevel?.trim() || null,
             diet_preference: next.dietPreference?.trim() || null,
             workout_preference: next.workoutPreference?.trim() || null,
+            workout_preferences: next.workoutPreferences ?? (next.workoutPreference ? [next.workoutPreference] : []),
             experience_level: next.experienceLevel?.trim() || null,
             calorie_target: next.calorieTarget ? Number(next.calorieTarget) || null : null,
             protein_target: next.proteinTarget ? Number(next.proteinTarget) || null : null,
@@ -343,6 +364,7 @@ export const useAppStore = create<AppState>()(
             workout_frequency_goal: next.workoutFrequencyGoal ? Number(next.workoutFrequencyGoal) || null : null,
             movement_goal: next.movementGoal ? Number(next.movementGoal) || null : null,
             habit_priorities: next.habitPriorities ?? [],
+            selected_goals: next.selectedGoals ?? [],
             focus_statement: next.focusStatement?.trim() || null,
             has_completed_onboarding: isProfileComplete({ ...next, userId }),
           };
@@ -358,6 +380,7 @@ export const useAppStore = create<AppState>()(
               activity_level: profile.activity_level,
               diet_preference: profile.diet_preference,
               workout_preference: profile.workout_preference,
+              workout_preferences: profile.workout_preferences,
               experience_level: profile.experience_level,
               calorie_target: profile.calorie_target,
               protein_target: profile.protein_target,
@@ -365,6 +388,7 @@ export const useAppStore = create<AppState>()(
               workout_frequency_goal: profile.workout_frequency_goal,
               movement_goal: profile.movement_goal,
               habit_priorities: profile.habit_priorities,
+              selected_goals: profile.selected_goals,
               focus_statement: profile.focus_statement,
               habits: next.habits ?? [],
               intentions: next.intentions ?? [],
@@ -400,6 +424,7 @@ export const useAppStore = create<AppState>()(
           moods: [],
           meals: [],
           workouts: [],
+          dailyActivity: [],
           dashboardSummary: {
             completedHabits: 0,
             totalHabits: 0,
@@ -495,39 +520,108 @@ export const useAppStore = create<AppState>()(
           tasks: state.tasks.filter((t) => t.id !== taskId),
         })),
 
-      addGoal: ({ title, description, color, target, dueDate }) =>
-        set((state) => ({
-          goals: [
-            ...state.goals,
-            {
-              id: uid(),
-              title: title.trim(),
-              description: description?.trim() || undefined,
-              color,
-              target,
-              progress: 0,
-              dueDate,
-              createdAt: Date.now(),
-            },
-          ],
-        })),
+      loadGoals: async () => {
+        try {
+          const userId = await getCurrentUserId();
+          const { data, error } = await supabase
+            .from('goals')
+            .select('id,user_id,title,description,color,category,target_unit,target,progress,due_date,created_at')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: true });
+          if (error) throw error;
+          set({
+            goals: (data ?? []).map((row) => ({
+              id: row.id,
+              userId: row.user_id,
+              title: row.title,
+              description: row.description ?? undefined,
+              color: (row.color ?? 'accent') as AccentColor,
+              category: (row.category ?? 'custom') as GoalCategory,
+              unit: (row.target_unit ?? 'count') as GoalUnit,
+              target: row.target,
+              progress: row.progress,
+              dueDate: row.due_date ?? undefined,
+              createdAt: toTimestamp(row.created_at),
+            })),
+          });
+        } catch (error) {
+          if (!isMissingSupabaseTableError(error)) set({ syncError: (error as Error).message });
+        }
+      },
 
-      incrementGoal: (goalId, delta) =>
-        set((state) => ({
-          goals: state.goals.map((g) =>
-            g.id === goalId
-              ? {
-                  ...g,
-                  progress: Math.max(0, Math.min(g.target, g.progress + delta)),
-                }
-              : g
-          ),
-        })),
+      addGoal: async ({ title, description, color, category = 'custom', unit = 'count', target, dueDate }) => {
+        const userId = await getCurrentUserId();
+        const { data, error } = await supabase
+          .from('goals')
+          .insert({
+            user_id: userId,
+            title: title.trim(),
+            description: description?.trim() || null,
+            color,
+            category,
+            target_unit: unit,
+            target,
+            progress: 0,
+            due_date: dueDate ?? null,
+          })
+          .select('id,user_id,title,description,color,category,target_unit,target,progress,due_date,created_at')
+          .single();
+        if (error) throw error;
+        const goal: Goal = {
+          id: data.id,
+          userId: data.user_id,
+          title: data.title,
+          description: data.description ?? undefined,
+          color: (data.color ?? color) as AccentColor,
+          category: (data.category ?? category) as GoalCategory,
+          unit: (data.target_unit ?? unit) as GoalUnit,
+          target: data.target,
+          progress: data.progress,
+          dueDate: data.due_date ?? undefined,
+          createdAt: toTimestamp(data.created_at),
+        };
+        set((state) => ({ goals: [...state.goals, goal] }));
+      },
 
-      deleteGoal: (goalId) =>
+      addGoalTemplates: async (templates) => {
+        const state = useAppStore.getState();
+        for (const template of templates) {
+          if (state.goals.some((goal) => goal.title === template.title)) continue;
+          await useAppStore.getState().addGoal({
+            title: template.title,
+            description: template.description,
+            color: template.color,
+            category: template.category,
+            unit: template.unit,
+            target: template.target,
+          });
+        }
+      },
+
+      incrementGoal: async (goalId, delta) => {
+        const userId = await getCurrentUserId();
+        const current = useAppStore.getState().goals.find((g) => g.id === goalId);
+        if (!current) return;
+        const progress = Math.max(0, Math.min(current.target, current.progress + delta));
+        const { error } = await supabase
+          .from('goals')
+          .update({ progress })
+          .eq('id', goalId)
+          .eq('user_id', userId);
+        if (error) throw error;
+        set((state) => ({
+          goals: state.goals.map((g) => (g.id === goalId ? { ...g, progress } : g)),
+        }));
+      },
+
+      deleteGoal: async (goalId) => {
+        const userId = await getCurrentUserId();
+        const { error } = await supabase.from('goals').delete().eq('id', goalId).eq('user_id', userId);
+        if (error) throw error;
         set((state) => ({
           goals: state.goals.filter((g) => g.id !== goalId),
-        })),
+        }));
+      },
 
       loadReflections: async () => {
         set({ isSyncing: true, syncError: undefined });
@@ -938,6 +1032,102 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      loadDailyActivity: async () => {
+        try {
+          const userId = await getCurrentUserId();
+          const { data, error } = await supabase
+            .from('daily_activity')
+            .select(
+              'id,user_id,date,source,steps,calories_burned,active_minutes,exercise_minutes,distance_meters,workouts_count,sleep_minutes,avg_heart_rate,synced_at,created_at'
+            )
+            .eq('user_id', userId)
+            .gte('date', daysAgoISO(29))
+            .order('date', { ascending: false });
+          if (error) throw error;
+          set({
+            dailyActivity: (data ?? []).map((row) => ({
+              id: row.id,
+              userId: row.user_id,
+              date: row.date,
+              source: row.source,
+              steps: asNumber(row.steps),
+              caloriesBurned: asNumber(row.calories_burned),
+              activeMinutes: asNumber(row.active_minutes),
+              exerciseMinutes: asNumber(row.exercise_minutes),
+              distanceMeters: asNumber(row.distance_meters),
+              workoutsCount: asNumber(row.workouts_count),
+              sleepMinutes: row.sleep_minutes == null ? undefined : asNumber(row.sleep_minutes),
+              avgHeartRate: row.avg_heart_rate == null ? undefined : asNumber(row.avg_heart_rate),
+              syncedAt: row.synced_at ?? undefined,
+              createdAt: toTimestamp(row.created_at),
+            })),
+          });
+        } catch (error) {
+          if (!isMissingSupabaseTableError(error)) {
+            set({ syncError: (error as Error).message });
+          }
+        }
+      },
+
+      saveDailyActivity: async (activity) => {
+        const userId = await getCurrentUserId();
+        const payload = {
+          user_id: userId,
+          date: activity.date,
+          source: activity.source,
+          steps: Math.max(0, Math.round(activity.steps || 0)),
+          calories_burned: Math.max(0, Math.round(activity.caloriesBurned || 0)),
+          active_minutes: Math.max(0, Math.round(activity.activeMinutes || 0)),
+          exercise_minutes: Math.max(0, Math.round(activity.exerciseMinutes || 0)),
+          distance_meters: Math.max(0, Math.round(activity.distanceMeters || 0)),
+          workouts_count: Math.max(0, Math.round(activity.workoutsCount || 0)),
+          sleep_minutes:
+            activity.sleepMinutes == null ? null : Math.max(0, Math.round(activity.sleepMinutes)),
+          avg_heart_rate:
+            activity.avgHeartRate == null ? null : Math.max(0, Math.round(activity.avgHeartRate)),
+          synced_at: activity.syncedAt ?? new Date().toISOString(),
+        };
+        const { data, error } = await supabase
+          .from('daily_activity')
+          .upsert(payload, { onConflict: 'user_id,date,source' })
+          .select(
+            'id,user_id,date,source,steps,calories_burned,active_minutes,exercise_minutes,distance_meters,workouts_count,sleep_minutes,avg_heart_rate,synced_at,created_at'
+          )
+          .single();
+        if (error) throw error;
+        const next: DailyActivitySummary = {
+          id: data.id,
+          userId: data.user_id,
+          date: data.date,
+          source: data.source,
+          steps: asNumber(data.steps),
+          caloriesBurned: asNumber(data.calories_burned),
+          activeMinutes: asNumber(data.active_minutes),
+          exerciseMinutes: asNumber(data.exercise_minutes),
+          distanceMeters: asNumber(data.distance_meters),
+          workoutsCount: asNumber(data.workouts_count),
+          sleepMinutes: data.sleep_minutes == null ? undefined : asNumber(data.sleep_minutes),
+          avgHeartRate: data.avg_heart_rate == null ? undefined : asNumber(data.avg_heart_rate),
+          syncedAt: data.synced_at ?? undefined,
+          createdAt: toTimestamp(data.created_at),
+        };
+        set((state) => ({
+          dailyActivity: [
+            next,
+            ...state.dailyActivity.filter(
+              (item) => !(item.date === next.date && item.source === next.source)
+            ),
+          ].sort((a, b) => b.date.localeCompare(a.date)),
+        }));
+      },
+
+      syncDailyActivity: async (date = todayISO()) => {
+        const activity = await healthSync.syncDailyActivity(date);
+        if (activity) {
+          await useAppStore.getState().saveDailyActivity(activity);
+        }
+      },
+
       loadCoreData: async () => {
         const state = useAppStore.getState();
         await Promise.all([
@@ -946,6 +1136,8 @@ export const useAppStore = create<AppState>()(
           state.loadWorkouts(),
           state.loadReflections(),
           state.loadDashboardSummary(),
+          state.loadGoals(),
+          state.loadDailyActivity(),
         ]);
       },
     }),
@@ -960,6 +1152,7 @@ export const useAppStore = create<AppState>()(
         moods: state.moods,
         meals: state.meals,
         workouts: state.workouts,
+        dailyActivity: state.dailyActivity,
         dashboardSummary: state.dashboardSummary,
       }),
     }

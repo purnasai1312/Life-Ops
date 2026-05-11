@@ -37,7 +37,8 @@ export default function WorkoutsScreen() {
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState<WorkoutLog | null>(null);
   const [saving, setSaving] = useState(false);
-  const [range, setRange] = useState<'today' | '7' | '30'>('today');
+  const [tab, setTab] = useState<'suggested' | 'today' | 'history'>('suggested');
+  const [range, setRange] = useState<'7' | '30'>('7');
 
   useEffect(() => {
     loadWorkouts().catch(() => {});
@@ -56,8 +57,8 @@ export default function WorkoutsScreen() {
   const completed = todayWorkouts.length > 0;
   const suggestions = useMemo(() => getWorkoutSuggestions(preferences), [preferences]);
   const rangeDates = useMemo(
-    () => (range === 'today' ? [today] : lastNDates(range === '7' ? 7 : 30)),
-    [range, today]
+    () => lastNDates(range === '7' ? 7 : 30),
+    [range]
   );
   const historyWorkouts = useMemo(
     () => workouts.filter((workout) => rangeDates.includes(workout.date)),
@@ -184,20 +185,32 @@ export default function WorkoutsScreen() {
         </Card>
       </Animated.View>
 
-      {suggestions.length > 0 ? (
+      <Segmented
+        options={['suggested', 'today', 'history'] as const}
+        value={tab}
+        onChange={setTab}
+      />
+
+      {tab === 'suggested' ? (
         <Animated.View entering={FadeInDown.delay(125).duration(500)} style={{ gap: 12 }}>
-          <Typo variant="eyebrow" color={Colors.inkMuted}>
-            Suggested for your plan
-          </Typo>
+          <View style={{ gap: 4 }}>
+            <Typo variant="eyebrow" color={Colors.inkMuted}>
+              Suggested for your plan
+            </Typo>
+            <Typo variant="caption" color={Colors.inkMuted}>
+              Filtered by your goal, workout preference, and experience level.
+            </Typo>
+          </View>
           <View style={{ gap: 10 }}>
             {suggestions.map((workout) => (
               <Card key={workout.title} padding={16}>
-                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
                   <View style={{ flex: 1, gap: 4 }}>
                     <Typo variant="bodyEmphasis">{workout.title}</Typo>
                     <Typo variant="caption" color={Colors.inkMuted}>
-                      {workout.durationMinutes} min · {workout.workoutType}
+                      {workout.durationMinutes} min · {workout.difficulty} · {workout.estimatedCaloriesRange[0]}-{workout.estimatedCaloriesRange[1]} cal
                     </Typo>
+                    <Typo variant="caption">{workout.prescription}</Typo>
                   </View>
                   <Button
                     title="Add"
@@ -223,6 +236,7 @@ export default function WorkoutsScreen() {
         </Animated.View>
       ) : null}
 
+      {tab === 'today' ? (
       <Animated.View entering={FadeInDown.delay(150).duration(500)}>
         <Card padding={20}>
           <View style={{ gap: 14 }}>
@@ -278,13 +292,36 @@ export default function WorkoutsScreen() {
           </View>
         </Card>
       </Animated.View>
+      ) : null}
 
+      {tab === 'today' ? (
+        <Animated.View entering={FadeInDown.delay(175).duration(500)} style={{ gap: 12 }}>
+          <Typo variant="eyebrow" color={Colors.inkMuted}>
+            Today
+          </Typo>
+          {todayWorkouts.length === 0 ? (
+            <EmptyState
+              icon="barbell-outline"
+              title="No workout logged today"
+              description="Log a workout manually, add a suggestion, or mark a rest day."
+            />
+          ) : (
+            <View style={{ gap: 10 }}>
+              {todayWorkouts.map((workout) => (
+                <WorkoutCard key={workout.id} workout={workout} onEdit={startEdit} onDelete={remove} />
+              ))}
+            </View>
+          )}
+        </Animated.View>
+      ) : null}
+
+      {tab === 'history' ? (
       <Animated.View entering={FadeInDown.delay(200).duration(500)} style={{ gap: 12 }}>
         <View style={{ gap: 10 }}>
           <Typo variant="eyebrow" color={Colors.inkMuted}>
             Workout history
           </Typo>
-          <Segmented options={['today', '7', '30'] as const} value={range} onChange={setRange} />
+          <Segmented options={['7', '30'] as const} value={range} onChange={setRange} />
         </View>
         {historyWorkouts.length === 0 ? (
           <EmptyState
@@ -310,6 +347,7 @@ export default function WorkoutsScreen() {
           </View>
         )}
       </Animated.View>
+      ) : null}
     </Screen>
   );
 }

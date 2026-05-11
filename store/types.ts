@@ -35,14 +35,48 @@ export interface Task {
 
 export interface Goal {
   id: string;
+  userId?: string;
   title: string;
   description?: string;
   color: AccentColor;
+  category: GoalCategory;
+  unit: GoalUnit;
   target: number;
   progress: number;
   dueDate?: string; // ISO date
   createdAt: number;
 }
+
+export type GoalCategory =
+  | 'nutrition'
+  | 'workout'
+  | 'movement'
+  | 'sleep'
+  | 'hydration'
+  | 'mindfulness'
+  | 'recovery'
+  | 'cardio'
+  | 'strength'
+  | 'mobility'
+  | 'custom';
+
+export type GoalUnit =
+  | 'grams protein'
+  | 'calories'
+  | 'meals logged'
+  | 'sessions/week'
+  | 'minutes'
+  | 'workouts completed'
+  | 'steps/day'
+  | 'minutes walking'
+  | 'hours/night'
+  | 'cups/day'
+  | 'liters/day'
+  | 'oz/day'
+  | 'check-ins/week'
+  | 'count'
+  | 'times/week'
+  | 'yes/no';
 
 export type MoodValue = 1 | 2 | 3 | 4 | 5;
 
@@ -86,6 +120,25 @@ export interface WorkoutLog {
   createdAt: number;
 }
 
+export type HealthSyncSource = 'apple_health' | 'health_connect' | 'google_fit' | 'manual';
+
+export interface DailyActivitySummary {
+  id?: string;
+  userId?: string;
+  date: string;
+  source: HealthSyncSource;
+  steps: number;
+  caloriesBurned: number;
+  activeMinutes: number;
+  exerciseMinutes: number;
+  distanceMeters: number;
+  workoutsCount: number;
+  sleepMinutes?: number;
+  avgHeartRate?: number;
+  syncedAt?: string;
+  createdAt?: number;
+}
+
 export interface Preferences {
   userId?: string;
   name: string;
@@ -100,6 +153,7 @@ export interface Preferences {
   activityLevel?: string;
   dietPreference?: string;
   workoutPreference?: string;
+  workoutPreferences?: string[];
   experienceLevel?: string;
   calorieTarget?: string;
   proteinTarget?: string;
@@ -107,6 +161,7 @@ export interface Preferences {
   workoutFrequencyGoal?: string;
   movementGoal?: string;
   habitPriorities?: string[];
+  selectedGoals?: string[];
   habits?: string[];
   intentions?: string[];
 }
@@ -122,6 +177,7 @@ export interface OnboardingProfile {
   activityLevel: string;
   dietPreference: string;
   workoutPreference: string;
+  workoutPreferences: string[];
   experienceLevel: string;
   calorieTarget: string;
   proteinTarget: string;
@@ -129,6 +185,7 @@ export interface OnboardingProfile {
   workoutFrequencyGoal: string;
   movementGoal: string;
   habitPriorities: string[];
+  selectedGoals: string[];
   habits: string[];
   intentions: string[];
 }

@@ -39,6 +39,7 @@ export default function TodayScreen() {
   const moods = useAppStore((s) => s.moods);
   const meals = useAppStore((s) => s.meals);
   const workouts = useAppStore((s) => s.workouts);
+  const dailyActivity = useAppStore((s) => s.dailyActivity);
   const dashboardSummary = useAppStore((s) => s.dashboardSummary);
   const loadCoreData = useAppStore((s) => s.loadCoreData);
   const toggleTask = useAppStore((s) => s.toggleTask);
@@ -63,6 +64,19 @@ export default function TodayScreen() {
     () => workouts.filter((workout) => workout.date === today),
     [workouts, today]
   );
+  const todayActivity = useMemo(
+    () => dailyActivity.find((activity) => activity.date === today),
+    [dailyActivity, today]
+  );
+  const weekActivity = useMemo(() => {
+    const dates = lastNDates(7);
+    return dates.map((date) => ({
+      date,
+      steps: dailyActivity
+        .filter((activity) => activity.date === date)
+        .reduce((sum, activity) => sum + activity.steps, 0),
+    }));
+  }, [dailyActivity]);
   const nutritionTargets = useMemo(
     () => getNutritionTargets(preferences),
     [preferences]
@@ -87,7 +101,15 @@ export default function TodayScreen() {
     nutritionTargets.proteinG
   );
   const habitPercentage = calculateHabitPercentage(habitsDoneToday, totalHabits);
-  const hasWorkoutToday = todayWorkouts.length > 0;
+  const movementGoal = Math.max(1, Number(preferences.movementGoal) || 8000);
+  const stepsToday = todayActivity?.steps ?? 0;
+  const stepPercentage = Math.max(0, Math.min(100, (stepsToday / movementGoal) * 100));
+  const activityWorkoutLogged =
+    (todayActivity?.workoutsCount ?? 0) > 0 || (todayActivity?.exerciseMinutes ?? 0) > 0;
+  const hasWorkoutToday = todayWorkouts.length > 0 || activityWorkoutLogged;
+  const workoutMinutes =
+    todayWorkouts.reduce((sum, workout) => sum + workout.durationMinutes, 0) +
+    (todayActivity?.exerciseMinutes ?? 0);
   const hasReflectionToday = moods.some((m) => m.date === today);
   const goalProgress = dashboardSummary.goalProgress;
   const calculatedDailyScore = calculateDailyScore({
@@ -111,6 +133,7 @@ export default function TodayScreen() {
   const openReflect = useCallback(() => router.push('/(tabs)/reflect'), [router]);
   const openMeals = useCallback(() => router.push('/(tabs)/meals' as any), [router]);
   const openWorkouts = useCallback(() => router.push('/(tabs)/workouts' as any), [router]);
+  const openActivity = useCallback(() => router.push('/(tabs)/activity' as any), [router]);
 
   return (
     <Screen>
@@ -235,14 +258,21 @@ export default function TodayScreen() {
                 color={Colors.mustard}
               />
               <Stat
-                label="Workout"
-                value={hasWorkoutToday ? 'logged' : 'open'}
-                progress={hasWorkoutToday ? 100 : 0}
-                color={Colors.plum}
+                label="Steps"
+                value={`${stepsToday}/${movementGoal}`}
+                progress={stepPercentage}
+                color={Colors.forest}
               />
             </View>
           </View>
           <View style={{ marginTop: 18, paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.borderSoft, gap: 10 }}>
+            <Stat label="Burned" value={`${todayActivity?.caloriesBurned ?? 0} cal`} progress={todayActivity?.caloriesBurned ? 100 : 0} color={Colors.sky} />
+            <Stat
+              label="Workout"
+              value={hasWorkoutToday ? `${workoutMinutes} min` : 'open'}
+              progress={hasWorkoutToday ? 100 : 0}
+              color={Colors.plum}
+            />
             <Stat label="Habits" value={`${habitsDoneToday}/${totalHabits}`} progress={habitProgress} color={Colors.forest} />
             <Stat label="Goals" value={`${Math.round(goalProgress * 100)}%`} progress={goalProgress} color={Colors.ink} />
             <Stat label="Reflect" value={hasReflectionToday ? 'done' : 'open'} progress={hasReflectionToday ? 100 : 0} color={Colors.sky} />
@@ -280,22 +310,41 @@ export default function TodayScreen() {
       <Animated.View entering={FadeInDown.delay(180).duration(500)} style={{ gap: 12 }}>
         <HeaderRow
           eyebrow="Movement"
-          title="Workout status"
-          actionLabel={hasWorkoutToday ? 'Open' : 'Log'}
+          title="Activity status"
+          actionLabel={todayActivity ? 'Open' : 'Log'}
           actionIcon="arrow-forward"
-          onAction={openWorkouts}
+          onAction={todayActivity ? openActivity : openWorkouts}
         />
-        <Card tone={hasWorkoutToday ? 'default' : 'outlined'} padding={18}>
+        <Card tone={todayActivity || hasWorkoutToday ? 'default' : 'outlined'} padding={18} style={{ gap: 14 }}>
           <Typo variant="bodyEmphasis">
-            {hasWorkoutToday
-              ? `${todayWorkouts.reduce((sum, workout) => sum + workout.durationMinutes, 0)} minutes logged`
-              : 'No workout logged yet.'}
+            {todayActivity
+              ? `${stepsToday} steps · ${todayActivity.activeMinutes} active minutes`
+              : hasWorkoutToday
+                ? `${workoutMinutes} minutes logged`
+                : 'No activity logged yet.'}
           </Typo>
-          <Typo variant="body" color={Colors.inkMuted} style={{ marginTop: 4 }}>
-            {hasWorkoutToday
-              ? `${todayWorkouts.length} activity ${todayWorkouts.length === 1 ? 'entry' : 'entries'} from Supabase.`
-              : 'Add a workout, walk, or rest day when it happens.'}
+          <Typo variant="body" color={Colors.inkMuted}>
+            {todayActivity
+              ? `${todayActivity.caloriesBurned} calories burned · ${Math.round(todayActivity.distanceMeters)} meters · ${todayActivity.source.replace('_', ' ')}.`
+              : 'Connect Health Sync or add a manual walk, workout, or rest day when it happens.'}
           </Typo>
+          <View style={{ flexDirection: 'row', gap: 6, alignItems: 'flex-end', height: 54 }}>
+            {weekActivity.map((item) => {
+              const ratio = Math.min(1, item.steps / movementGoal);
+              return (
+                <View key={item.date} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
+                  <View
+                    style={{
+                      width: 14,
+                      height: Math.max(4, ratio * 42),
+                      borderRadius: 7,
+                      backgroundColor: item.date === today ? Colors.forest : Colors.border,
+                    }}
+                  />
+                </View>
+              );
+            })}
+          </View>
         </Card>
       </Animated.View>
 

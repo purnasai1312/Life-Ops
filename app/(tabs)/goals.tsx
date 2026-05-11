@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { View, Pressable, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,24 +14,30 @@ import { Colors, DisplayFont, Radii } from '@/constants/Theme';
 import { Fonts } from '@/constants/Typography';
 import { useAppStore } from '@/store/useAppStore';
 import { accentPair } from '@/utils/colors';
+import { GOAL_CATEGORY_META } from '@/utils/goals';
 import { daysUntil, formatShortDate } from '@/utils/date';
 
 export default function GoalsScreen() {
   const router = useRouter();
   const goals = useAppStore((s) => s.goals);
+  const loadGoals = useAppStore((s) => s.loadGoals);
   const incrementGoal = useAppStore((s) => s.incrementGoal);
   const deleteGoal = useAppStore((s) => s.deleteGoal);
+
+  useEffect(() => {
+    loadGoals().catch(() => {});
+  }, [loadGoals]);
 
   const handleDelete = (id: string, title: string) => {
     if (Platform.OS === 'web') {
       if (typeof window !== 'undefined' && window.confirm(`Remove "${title}"?`)) {
-        deleteGoal(id);
+        deleteGoal(id).catch(() => {});
       }
       return;
     }
     Alert.alert(`Remove "${title}"?`, undefined, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => deleteGoal(id) },
+      { text: 'Remove', style: 'destructive', onPress: () => deleteGoal(id).catch(() => {}) },
     ]);
   };
 
@@ -110,7 +117,7 @@ export default function GoalsScreen() {
         <EmptyState
           icon="telescope-outline"
           title="No goals yet"
-          description="Name one meaningful pursuit. We&#39;ll help you tend it over weeks and months."
+          description="Choose a health or consistency goal like protein, workouts, water, sleep, walking, or reflection."
           cta={{
             label: 'Set a goal',
             icon: 'add',
@@ -123,6 +130,7 @@ export default function GoalsScreen() {
             const pair = accentPair(g.color);
             const pct = g.target > 0 ? g.progress / g.target : 0;
             const days = daysUntil(g.dueDate);
+            const meta = GOAL_CATEGORY_META[g.category ?? 'custom'];
             return (
               <Animated.View
                 key={g.id}
@@ -145,14 +153,22 @@ export default function GoalsScreen() {
                         gap: 12,
                       }}
                     >
+                      <View
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 21,
+                          borderWidth: 1,
+                          borderColor: Colors.border,
+                          backgroundColor: Colors.bgElevated,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Ionicons name={meta.icon} size={20} color={Colors.inkSoft} />
+                      </View>
                       <View style={{ flex: 1, gap: 6 }}>
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 8,
-                          }}
-                        >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                           <View
                             style={{
                               width: 6,
@@ -166,9 +182,7 @@ export default function GoalsScreen() {
                             color={pair.ink}
                             style={{ fontSize: 10 }}
                           >
-                            {g.dueDate
-                              ? `by ${formatShortDate(g.dueDate)}`
-                              : 'no deadline'}
+                            {meta.label}{g.dueDate ? ` · by ${formatShortDate(g.dueDate)}` : ''}
                           </Typo>
                         </View>
                         <Typo
@@ -227,6 +241,8 @@ export default function GoalsScreen() {
                           >
                             {' / '}
                             {g.target}
+                            {' '}
+                            {g.unit}
                           </Typo>
                         </Typo>
                         <Typo
@@ -272,14 +288,14 @@ export default function GoalsScreen() {
                     <StepButton
                       icon="remove"
                       disabled={g.progress === 0}
-                      onPress={() => incrementGoal(g.id, -1)}
+                      onPress={() => incrementGoal(g.id, -1).catch(() => {})}
                       side="left"
                     />
                     <View style={{ width: 1, backgroundColor: Colors.borderSoft }} />
                     <StepButton
                       icon="add"
                       label="Log progress"
-                      onPress={() => incrementGoal(g.id, 1)}
+                      onPress={() => incrementGoal(g.id, 1).catch(() => {})}
                       color={pair.ink}
                       background={pair.soft}
                       side="right"

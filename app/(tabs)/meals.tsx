@@ -44,7 +44,8 @@ export default function MealsScreen() {
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState<MealEntry | null>(null);
   const [saving, setSaving] = useState(false);
-  const [range, setRange] = useState<'today' | '7' | '30'>('today');
+  const [tab, setTab] = useState<'suggested' | 'today' | 'history'>('suggested');
+  const [range, setRange] = useState<'7' | '30'>('7');
 
   useEffect(() => {
     loadMeals().catch(() => {});
@@ -73,8 +74,8 @@ export default function MealsScreen() {
   const proteinPct = calculateProteinPercentage(totals.proteinG, targets.proteinG);
   const suggestions = useMemo(() => getMealSuggestions(preferences), [preferences]);
   const rangeDates = useMemo(
-    () => (range === 'today' ? [today] : lastNDates(range === '7' ? 7 : 30)),
-    [range, today]
+    () => lastNDates(range === '7' ? 7 : 30),
+    [range]
   );
   const historyMeals = useMemo(
     () => meals.filter((meal) => rangeDates.includes(meal.date)),
@@ -182,20 +183,32 @@ export default function MealsScreen() {
         </Card>
       </Animated.View>
 
-      {suggestions.length > 0 ? (
+      <Segmented
+        options={['suggested', 'today', 'history'] as const}
+        value={tab}
+        onChange={setTab}
+      />
+
+      {tab === 'suggested' ? (
         <Animated.View entering={FadeInDown.delay(125).duration(500)} style={{ gap: 12 }}>
-          <Typo variant="eyebrow" color={Colors.inkMuted}>
-            Suggested for your goal
-          </Typo>
+          <View style={{ gap: 4 }}>
+            <Typo variant="eyebrow" color={Colors.inkMuted}>
+              Suggested for your goal
+            </Typo>
+            <Typo variant="caption" color={Colors.inkMuted}>
+              Filtered by your goal and diet preference.
+            </Typo>
+          </View>
           <View style={{ gap: 10 }}>
             {suggestions.map((meal) => (
               <Card key={meal.title} padding={16}>
-                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
                   <View style={{ flex: 1, gap: 4 }}>
                     <Typo variant="bodyEmphasis">{meal.title}</Typo>
                     <Typo variant="caption" color={Colors.inkMuted}>
-                      {meal.calories} cal · {meal.proteinG}g protein · {meal.mealType}
+                      {meal.calories} cal · {meal.proteinG}g protein · {meal.carbsG}g carbs · {meal.fatG}g fat
                     </Typo>
+                    <Typo variant="caption">{meal.notes}</Typo>
                   </View>
                   <Button
                     title="Add"
@@ -222,6 +235,7 @@ export default function MealsScreen() {
         </Animated.View>
       ) : null}
 
+      {tab === 'today' ? (
       <Animated.View entering={FadeInDown.delay(150).duration(500)}>
         <Card padding={20}>
           <View style={{ gap: 14 }}>
@@ -298,16 +312,39 @@ export default function MealsScreen() {
           </View>
         </Card>
       </Animated.View>
+      ) : null}
 
+      {tab === 'today' ? (
+        <Animated.View entering={FadeInDown.delay(175).duration(500)} style={{ gap: 12 }}>
+          <Typo variant="eyebrow" color={Colors.inkMuted}>
+            Today
+          </Typo>
+          {todayMeals.length === 0 ? (
+            <EmptyState
+              icon="restaurant-outline"
+              title="No meals logged today"
+              description="Log a meal manually or add one from suggestions."
+            />
+          ) : (
+            <View style={{ gap: 10 }}>
+              {todayMeals.map((meal) => (
+                <MealCard key={meal.id} meal={meal} onEdit={startEdit} onDelete={remove} />
+              ))}
+            </View>
+          )}
+        </Animated.View>
+      ) : null}
+
+      {tab === 'history' ? (
       <Animated.View entering={FadeInDown.delay(200).duration(500)} style={{ gap: 12 }}>
         <View style={{ gap: 10 }}>
           <Typo variant="eyebrow" color={Colors.inkMuted}>
             Meal history
           </Typo>
           <Segmented
-            options={['today', '7', '30'] as const}
+            options={['7', '30'] as const}
             value={range}
-            onChange={setRange}
+            onChange={(next) => setRange(next)}
           />
         </View>
         {historyMeals.length === 0 ? (
@@ -336,6 +373,7 @@ export default function MealsScreen() {
           </View>
         )}
       </Animated.View>
+      ) : null}
     </Screen>
   );
 }

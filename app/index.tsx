@@ -15,13 +15,12 @@ import Svg, { Circle, Line } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, DisplayFont } from '@/constants/Theme';
 import { Typo } from '@/components/typography';
-import { useAppStore } from '@/store/useAppStore';
 import { useAuth } from '@/lib/auth';
+import { getPostAuthRedirect } from '@/lib/auth-routing';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export default function SplashScreen() {
-  const loadProfile = useAppStore((s) => s.loadProfile);
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const [redirect, setRedirect] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
@@ -52,25 +51,13 @@ export default function SplashScreen() {
         // Not logged in → go to login
         setRedirect('/(auth)/login');
       } else {
-        loadProfile()
-          .then(() => {
-            const preferences = useAppStore.getState().preferences;
-            const readyForTabs =
-              preferences.userId === user?.id &&
-              preferences.hasCompletedOnboarding &&
-              Boolean(preferences.name?.trim()) &&
-              Boolean(preferences.goal) &&
-              Boolean(preferences.workoutPreference) &&
-              Boolean(preferences.experienceLevel) &&
-              Boolean(preferences.calorieTarget) &&
-              Boolean(preferences.proteinTarget);
-            setRedirect(readyForTabs ? '/(tabs)' : '/onboarding');
-          })
+        getPostAuthRedirect()
+          .then((nextRoute) => setRedirect(nextRoute))
           .catch(() => setRedirect('/onboarding'));
       }
     }, 1600);
     return () => clearTimeout(t);
-  }, [isAuthenticated, authLoading, loadProfile, user?.id]);
+  }, [isAuthenticated, authLoading, user?.id]);
 
   const rotatingStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],

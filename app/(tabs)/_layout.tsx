@@ -15,6 +15,7 @@ const TABS: {
   { name: 'index', label: 'Today', icon: 'sunny-outline', iconActive: 'sunny' },
   { name: 'meals', label: 'Meals', icon: 'restaurant-outline', iconActive: 'restaurant' },
   { name: 'workouts', label: 'Workouts', icon: 'barbell-outline', iconActive: 'barbell' },
+  { name: 'activity', label: 'Activity', icon: 'pulse-outline', iconActive: 'pulse' },
   { name: 'goals', label: 'Goals', icon: 'telescope-outline', iconActive: 'telescope' },
   { name: 'reflect', label: 'Reflect', icon: 'moon-outline', iconActive: 'moon' },
   { name: 'profile', label: 'Profile', icon: 'person-circle-outline', iconActive: 'person-circle' },
@@ -84,8 +85,8 @@ export default function TabLayout() {
                   accessibilityLabel={tab.label}
                   style={({ pressed }) => ({
                     minHeight: 48,
-                    minWidth: 48,
-                    paddingHorizontal: isFocused ? 12 : 8,
+                    minWidth: isFocused ? 52 : 42,
+                    paddingHorizontal: isFocused ? 10 : 6,
                     paddingVertical: 10,
                     borderRadius: Radii.pill,
                     backgroundColor: isFocused ? Colors.bgElevated : 'transparent',
@@ -105,7 +106,7 @@ export default function TabLayout() {
                     <Typo
                       variant="bodyEmphasis"
                       color={Colors.ink}
-                      style={{ fontSize: 12, letterSpacing: 0 }}
+                      style={{ fontSize: 11, letterSpacing: 0 }}
                     >
                       {tab.label}
                     </Typo>

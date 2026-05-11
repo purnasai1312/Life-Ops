@@ -8,10 +8,11 @@ import { Button } from '@/components/button';
 import { TextField } from '@/components/text-field';
 import { Colors, DisplayFont, Radii } from '@/constants/Theme';
 import { useAppStore } from '@/store/useAppStore';
-import type { AccentColor } from '@/store/types';
+import type { AccentColor, GoalCategory, GoalUnit } from '@/store/types';
 import { ACCENT_OPTIONS, accentPair } from '@/utils/colors';
+import { GOAL_CATEGORY_META } from '@/utils/goals';
 
-const TARGETS = [5, 10, 20, 30, 50, 100];
+const CATEGORIES = Object.keys(GOAL_CATEGORY_META) as GoalCategory[];
 
 export default function AddGoalModal() {
   const router = useRouter();
@@ -21,17 +22,21 @@ export default function AddGoalModal() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState<AccentColor>('accent');
-  const [target, setTarget] = useState<number>(10);
+  const [category, setCategory] = useState<GoalCategory>('nutrition');
+  const [unit, setUnit] = useState<GoalUnit>('grams protein');
+  const [target, setTarget] = useState('100');
 
-  const canSave = title.trim().length > 0 && target > 0;
+  const canSave = title.trim().length > 0 && Number(target) > 0;
 
-  const save = () => {
+  const save = async () => {
     if (!canSave) return;
-    addGoal({
+    await addGoal({
       title,
       description: description || undefined,
       color,
-      target,
+      category,
+      unit,
+      target: Number(target),
     });
     if (router.canGoBack()) router.back(); else router.replace('/(tabs)');
   };
@@ -111,7 +116,7 @@ export default function AddGoalModal() {
 
           <TextField
             label="The goal"
-            placeholder="e.g. Finish the manuscript"
+            placeholder="e.g. Hit protein target"
             value={title}
             onChangeText={setTitle}
             autoFocus
@@ -127,18 +132,22 @@ export default function AddGoalModal() {
 
           <View style={{ gap: 10 }}>
             <Typo variant="label" color={Colors.inkSoft}>
-              Target ({target} steps)
+              Category
             </Typo>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {TARGETS.map((t) => {
-                const active = target === t;
+              {CATEGORIES.map((c) => {
+                const active = category === c;
+                const meta = GOAL_CATEGORY_META[c];
                 return (
                   <Pressable
-                    key={t}
-                    onPress={() => setTarget(t)}
+                    key={c}
+                    onPress={() => {
+                      setCategory(c);
+                      setUnit(meta.units[0]);
+                    }}
                     style={({ pressed }) => ({
-                      paddingHorizontal: 16,
-                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 9,
                       borderRadius: Radii.pill,
                       backgroundColor: active ? Colors.ink : Colors.surface,
                       borderWidth: 1,
@@ -146,17 +155,55 @@ export default function AddGoalModal() {
                       opacity: pressed ? 0.8 : 1,
                     })}
                   >
-                    <Typo
-                      variant="bodyEmphasis"
-                      color={active ? '#FBF8F0' : Colors.ink}
-                    >
-                      {t}
+                    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                      <Ionicons name={meta.icon} size={15} color={active ? '#FBF8F0' : Colors.inkSoft} />
+                      <Typo variant="bodyEmphasis" color={active ? '#FBF8F0' : Colors.ink} style={{ fontSize: 13 }}>
+                        {meta.label}
+                      </Typo>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={{ gap: 10 }}>
+            <Typo variant="label" color={Colors.inkSoft}>
+              Unit
+            </Typo>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {GOAL_CATEGORY_META[category].units.map((u) => {
+                const active = unit === u;
+                return (
+                  <Pressable
+                    key={u}
+                    onPress={() => setUnit(u)}
+                    style={({ pressed }) => ({
+                      paddingHorizontal: 12,
+                      paddingVertical: 9,
+                      borderRadius: Radii.pill,
+                      backgroundColor: active ? Colors.ink : Colors.surface,
+                      borderWidth: 1,
+                      borderColor: active ? Colors.ink : Colors.border,
+                      opacity: pressed ? 0.8 : 1,
+                    })}
+                  >
+                    <Typo variant="bodyEmphasis" color={active ? '#FBF8F0' : Colors.ink} style={{ fontSize: 13 }}>
+                      {u}
                     </Typo>
                   </Pressable>
                 );
               })}
             </View>
           </View>
+
+          <TextField
+            label={`Target (${unit})`}
+            placeholder="e.g. 100"
+            value={target}
+            onChangeText={setTarget}
+            keyboardType="number-pad"
+          />
 
           <View style={{ gap: 10 }}>
             <Typo variant="label" color={Colors.inkSoft}>

@@ -18,6 +18,7 @@ import { Typo } from '@/components/typography';
 import { AuthInput } from '@/components/auth-input';
 import { AuthColors, AuthRadii } from '@/constants/AuthTheme';
 import { Fonts } from '@/constants/Typography';
+import { getPostAuthRedirect } from '@/lib/auth-routing';
 
 type AuthMethod = 'email' | 'phone';
 
@@ -55,7 +56,7 @@ export default function SignupScreen() {
       if (result?.emailConfirmationRequired) {
         setEmailSent(true);
       } else {
-        router.replace('/onboarding');
+        router.replace((await getPostAuthRedirect()) as any);
       }
     } catch (e: any) {
       setLocalError(e?.message || 'Sign up failed. Please try again.');
@@ -76,9 +77,9 @@ export default function SignupScreen() {
     clearError();
     try {
       await signInWithGoogle();
-      router.replace('/onboarding');
+      router.replace((await getPostAuthRedirect()) as any);
     } catch (e: any) {
-      setLocalError(e?.message || 'Google sign up failed');
+      setLocalError(e?.message || 'Google sign up failed. Please try again.');
     }
   };
 
@@ -87,9 +88,9 @@ export default function SignupScreen() {
     clearError();
     try {
       await signInWithApple();
-      router.replace('/onboarding');
+      router.replace((await getPostAuthRedirect()) as any);
     } catch (e: any) {
-      setLocalError(e?.message || 'Apple sign up failed');
+      setLocalError(e?.message || 'Apple sign up failed. Please try again.');
     }
   };
 
@@ -276,30 +277,32 @@ export default function SignupScreen() {
               </Typo>
             </Pressable>
 
-            <Pressable
-              onPress={handleAppleSignup}
-              disabled={isLoading}
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 12,
-                height: 52,
-                borderRadius: AuthRadii.button,
-                backgroundColor: AuthColors.card,
-                borderWidth: 1,
-                borderColor: AuthColors.border,
-                opacity: pressed ? 0.8 : 1,
-                transform: [{ scale: pressed ? 0.98 : 1 }],
-              })}
-            >
-              <Ionicons name="logo-apple" size={18} color={AuthColors.text} />
-              <Typo
-                style={{ fontFamily: Fonts.medium, fontSize: 15, color: AuthColors.text }}
+            {Platform.OS === 'ios' ? (
+              <Pressable
+                onPress={handleAppleSignup}
+                disabled={isLoading}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12,
+                  height: 52,
+                  borderRadius: AuthRadii.button,
+                  backgroundColor: AuthColors.card,
+                  borderWidth: 1,
+                  borderColor: AuthColors.border,
+                  opacity: pressed ? 0.8 : 1,
+                  transform: [{ scale: pressed ? 0.98 : 1 }],
+                })}
               >
-                Continue with Apple
-              </Typo>
-            </Pressable>
+                <Ionicons name="logo-apple" size={18} color={AuthColors.text} />
+                <Typo
+                  style={{ fontFamily: Fonts.medium, fontSize: 15, color: AuthColors.text }}
+                >
+                  Continue with Apple
+                </Typo>
+              </Pressable>
+            ) : null}
           </Animated.View>
 
           {/* Divider */}

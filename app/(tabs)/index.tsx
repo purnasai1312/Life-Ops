@@ -1,4 +1,4 @@
-import { View, Pressable } from 'react-native';
+import { Alert, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -44,6 +44,16 @@ export default function TodayScreen() {
   const loadCoreData = useAppStore((s) => s.loadCoreData);
   const toggleTask = useAppStore((s) => s.toggleTask);
   const toggleHabitToday = useAppStore((s) => s.toggleHabitToday);
+
+  const handleToggleHabit = useCallback(
+    (habitId: string) => {
+      toggleHabitToday(habitId).catch((error) => {
+        if (__DEV__) console.warn('Failed to update habit', error);
+        Alert.alert('Could not update habit', 'Please try again in a moment.');
+      });
+    },
+    [toggleHabitToday]
+  );
 
   const today = getTodayISO();
   useEffect(() => {
@@ -449,7 +459,7 @@ export default function TodayScreen() {
               return (
                 <Pressable
                   key={h.id}
-                  onPress={() => toggleHabitToday(h.id)}
+                  onPress={() => handleToggleHabit(h.id)}
                   style={({ pressed }) => ({
                     flexDirection: 'row',
                     alignItems: 'center',

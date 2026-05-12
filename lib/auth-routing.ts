@@ -1,5 +1,6 @@
 import * as AuthSession from 'expo-auth-session';
 import { useAppStore } from '@/store/useAppStore';
+import { decidePostAuthRoute } from '@/utils/auth-routing';
 import { supabase } from './supabase';
 
 export const getOAuthRedirectUri = () => {
@@ -24,7 +25,11 @@ export const getPostAuthRedirect = async () => {
     if (__DEV__) {
       console.info('[Auth routing] no valid session', sessionError?.message);
     }
-    return '/(auth)/login';
+    return decidePostAuthRoute({
+      hasSession: false,
+      hasUser: false,
+      onboardingComplete: false,
+    });
   }
 
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -32,7 +37,11 @@ export const getPostAuthRedirect = async () => {
     if (__DEV__) {
       console.info('[Auth routing] no valid user', userError?.message);
     }
-    return '/(auth)/login';
+    return decidePostAuthRoute({
+      hasSession: true,
+      hasUser: false,
+      onboardingComplete: false,
+    });
   }
 
   const userId = userData.user.id;
@@ -81,7 +90,11 @@ export const getPostAuthRedirect = async () => {
     }
   });
 
-  const route = onboardingComplete ? '/(tabs)' : '/onboarding';
+  const route = decidePostAuthRoute({
+    hasSession: true,
+    hasUser: true,
+    onboardingComplete,
+  });
   if (__DEV__) {
     console.info('[Auth routing] final route decision:', route);
   }

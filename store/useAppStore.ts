@@ -22,6 +22,14 @@ import type {
 } from './types';
 import type { GoalTemplate } from '@/utils/goals';
 import * as healthSync from '@/healthSync';
+import {
+  calculateCaloriePercentage,
+  calculateDailyScore,
+  calculateHabitPercentage,
+  calculateProteinPercentage,
+  clampPercentage,
+  computeStreak,
+} from '@/utils/calculations';
 
 const todayISO = () => {
   const d = new Date();
@@ -110,14 +118,15 @@ interface AppState {
   resetOnboardingForTesting: () => Promise<void>;
 
   // Habits
+  loadHabits: () => Promise<void>;
   addHabit: (input: {
     title: string;
     icon: string;
     color: AccentColor;
     cadence: HabitCadence;
-  }) => void;
-  toggleHabitToday: (habitId: string) => void;
-  deleteHabit: (habitId: string) => void;
+  }) => Promise<void>;
+  toggleHabitToday: (habitId: string) => Promise<void>;
+  deleteHabit: (habitId: string) => Promise<void>;
 
   // Tasks
   addTask: (input: { title: string; note?: string; date?: string }) => void;
@@ -186,31 +195,6 @@ const defaultPreferences: Preferences = {
   hasCompletedOnboarding: false,
   notificationsEnabled: true,
   weekStartsOnMonday: true,
-};
-
-/** Compute streak given completions map and cadence (daily only for now). */
-const computeStreak = (completions: Record<string, boolean>): number => {
-  let streak = 0;
-  const d = new Date();
-  // Count back day-by-day while the current day is marked true.
-  // If today isn't done yet, start from yesterday so the streak isn't lost.
-  const today = todayISO();
-  if (!completions[today]) {
-    d.setDate(d.getDate() - 1);
-  }
-  while (true) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const key = `${y}-${m}-${day}`;
-    if (completions[key]) {
-      streak += 1;
-      d.setDate(d.getDate() - 1);
-    } else {
-      break;
-    }
-  }
-  return streak;
 };
 
 export const useAppStore = create<AppState>()(
@@ -452,46 +436,167 @@ export const useAppStore = create<AppState>()(
         }));
       },
 
-      addHabit: ({ title, icon, color, cadence }) =>
-        set((state) => ({
-          habits: [
-            ...state.habits,
-            {
-              id: uid(),
-              title: title.trim(),
-              icon,
-              color,
-              cadence,
-              createdAt: Date.now(),
-              completions: {},
-              streak: 0,
-            },
-          ],
-        })),
+      loadHabits: async () => {
+        try {
+          const userId = await getCurrentUserId();
+          const [habitsResult, logsResult] = await Promise.all([
+            supabase
+              .from('habits')
+              .select('id,title,icon,color,cadence,created_at')
+              .eq('user_id', userId)
+              .eq('is_archived', false)
+              .order('created_at', { ascending: true }),
+            supabase
+              .from('habit_logs')
+              .select('habit_id,log_date,completed')
+              .eq('user_id', userId)
+              .gte('log_date', daysAgoISO(60)),
+          ]);
+          if (habitsResult.error) throw habitsResult.error;
+          if (logsResult.error) throw logsResult.error;
 
-      toggleHabitToday: (habitId) =>
-        set((state) => ({
-          habits: state.habits.map((h) => {
+          const logsByHabit = new Map<string, Record<string, boolean>>();
+          for (const log of logsResult.data ?? []) {
+            const completions = logsByHabit.get(log.habit_id) ?? {};
+            if (log.completed) completions[log.log_date] = true;
+            logsByHabit.set(log.habit_id, completions);
+          }
+
+          const habits = (habitsResult.data ?? []).map((row) => {
+            const completions = logsByHabit.get(row.id) ?? {};
+            return {
+              id: row.id,
+              title: row.title,
+              icon: row.icon ?? 'leaf-outline',
+              color: (row.color ?? 'forest') as AccentColor,
+              cadence: (row.cadence ?? 'daily') as HabitCadence,
+              createdAt: toTimestamp(row.created_at),
+              completions,
+              streak: computeStreak(completions),
+            };
+          });
+
+          set((state) => ({
+            habits,
+            dashboardSummary: {
+              ...state.dashboardSummary,
+              completedHabits: habits.filter((item) => item.completions[todayISO()]).length,
+              totalHabits: habits.length,
+            },
+          }));
+        } catch (error) {
+          if (!isMissingSupabaseTableError(error)) set({ syncError: (error as Error).message });
+        }
+      },
+
+      addHabit: async ({ title, icon, color, cadence }) => {
+        const userId = await getCurrentUserId();
+        const { data, error } = await supabase
+          .from('habits')
+          .insert({
+            user_id: userId,
+            title: title.trim(),
+            icon,
+            color,
+            cadence,
+          })
+          .select('id,title,icon,color,cadence,created_at')
+          .single();
+        if (error) throw error;
+        const habit: Habit = {
+          id: data.id,
+          title: data.title,
+          icon: data.icon ?? icon,
+          color: (data.color ?? color) as AccentColor,
+          cadence: (data.cadence ?? cadence) as HabitCadence,
+          createdAt: toTimestamp(data.created_at),
+          completions: {},
+          streak: 0,
+        };
+        set((state) => {
+          const habits = [...state.habits, habit];
+          return {
+            habits,
+            dashboardSummary: {
+              ...state.dashboardSummary,
+              completedHabits: habits.filter((item) => item.completions[todayISO()]).length,
+              totalHabits: habits.length,
+            },
+          };
+        });
+      },
+
+      toggleHabitToday: async (habitId) => {
+        const userId = await getCurrentUserId();
+        const key = todayISO();
+        const habit = useAppStore.getState().habits.find((h) => h.id === habitId);
+        if (!habit) return;
+        const nextCompleted = !habit.completions[key];
+
+        if (nextCompleted) {
+          const { error } = await supabase.from('habit_logs').upsert(
+            {
+              user_id: userId,
+              habit_id: habitId,
+              log_date: key,
+              completed: true,
+            },
+            { onConflict: 'habit_id,log_date' }
+          );
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('habit_logs')
+            .delete()
+            .eq('user_id', userId)
+            .eq('habit_id', habitId)
+            .eq('log_date', key);
+          if (error) throw error;
+        }
+
+        set((state) => {
+          const habits = state.habits.map((h) => {
             if (h.id !== habitId) return h;
-            const key = todayISO();
             const completions = { ...h.completions };
-            if (completions[key]) {
-              delete completions[key];
-            } else {
-              completions[key] = true;
-            }
+            if (nextCompleted) completions[key] = true;
+            else delete completions[key];
             return {
               ...h,
               completions,
               streak: computeStreak(completions),
             };
-          }),
-        })),
+          });
+          return {
+            habits,
+            dashboardSummary: {
+              ...state.dashboardSummary,
+              completedHabits: habits.filter((item) => item.completions[key]).length,
+              totalHabits: habits.length,
+            },
+          };
+        });
+      },
 
-      deleteHabit: (habitId) =>
-        set((state) => ({
-          habits: state.habits.filter((h) => h.id !== habitId),
-        })),
+      deleteHabit: async (habitId) => {
+        const userId = await getCurrentUserId();
+        const { error } = await supabase
+          .from('habits')
+          .delete()
+          .eq('id', habitId)
+          .eq('user_id', userId);
+        if (error) throw error;
+        set((state) => {
+          const habits = state.habits.filter((h) => h.id !== habitId);
+          return {
+            habits,
+            dashboardSummary: {
+              ...state.dashboardSummary,
+              completedHabits: habits.filter((item) => item.completions[todayISO()]).length,
+              totalHabits: habits.length,
+            },
+          };
+        });
+      },
 
       addTask: ({ title, note, date }) =>
         set((state) => ({
@@ -1132,6 +1237,7 @@ export const useAppStore = create<AppState>()(
         const state = useAppStore.getState();
         await Promise.all([
           state.loadProfile(),
+          state.loadHabits(),
           state.loadMeals(),
           state.loadWorkouts(),
           state.loadReflections(),
@@ -1160,9 +1266,6 @@ export const useAppStore = create<AppState>()(
 );
 
 export const getTodayISO = todayISO;
-
-export const clampPercentage = (value: number) =>
-  Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
 
 export const getNutritionTargets = (preferences: Preferences) => {
   const manualCalories = Number(preferences.calorieTarget);
@@ -1215,34 +1318,11 @@ export const getDefaultTargets = (input: {
   };
 };
 
-export const calculateCaloriePercentage = (consumed: number, target: number) =>
-  clampPercentage(target > 0 ? (consumed / target) * 100 : 0);
-
-export const calculateProteinPercentage = (consumed: number, target: number) =>
-  clampPercentage(target > 0 ? (consumed / target) * 100 : 0);
-
-export const calculateHabitPercentage = (completed: number, total: number) =>
-  clampPercentage(total > 0 ? (completed / total) * 100 : 0);
-
-export const calculateDailyScore = ({
-  caloriePercentage,
-  proteinPercentage,
-  habitPercentage,
-  workoutLogged,
-  reflectionLogged,
-}: {
-  caloriePercentage: number;
-  proteinPercentage: number;
-  habitPercentage: number;
-  workoutLogged: boolean;
-  reflectionLogged: boolean;
-}) => {
-  const parts = [
-    Math.min(caloriePercentage, 100),
-    Math.min(proteinPercentage, 100),
-    habitPercentage,
-    workoutLogged ? 100 : 0,
-    reflectionLogged ? 100 : 0,
-  ];
-  return clampPercentage(parts.reduce((sum, part) => sum + part, 0) / parts.length);
+export {
+  calculateCaloriePercentage,
+  calculateDailyScore,
+  calculateHabitPercentage,
+  calculateProteinPercentage,
+  clampPercentage,
+  computeStreak,
 };

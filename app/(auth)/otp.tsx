@@ -17,6 +17,7 @@ import { AuthInput } from '@/components/auth-input';
 import { AuthColors, AuthRadii } from '@/constants/AuthTheme';
 import { Fonts } from '@/constants/Typography';
 import { supabase } from '@/lib/supabase';
+import { getPostAuthRedirect } from '@/lib/auth-routing';
 
 export default function OTPScreen() {
   const insets = useSafeAreaInsets();
@@ -74,7 +75,7 @@ export default function OTPScreen() {
         type: 'sms',
       });
       if (verifyError) throw verifyError;
-      router.replace('/onboarding');
+      router.replace((await getPostAuthRedirect()) as any);
     } catch (e: any) {
       setError(e?.message || 'Invalid code. Please try again.');
     } finally {

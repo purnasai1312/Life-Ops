@@ -285,16 +285,16 @@ const normalizedGoal = (goal?: string) => {
 export function getMealSuggestions(preferences: Preferences) {
   const diet = (preferences.dietPreference || 'no preference').toLowerCase();
   const goal = normalizedGoal(preferences.goal);
-  return mealSuggestions
-    .filter((meal) => {
+  const dietMatches = mealSuggestions.filter((meal) => {
       if (includes(diet, 'vegan')) return meal.dietTags.includes('vegan');
       if (includes(diet, 'vegetarian')) return meal.dietTags.includes('vegetarian');
       if (includes(diet, 'pescatarian')) {
         return meal.dietTags.includes('pescatarian') || meal.dietTags.includes('vegetarian') || meal.dietTags.includes('vegan');
       }
       return meal.dietTags.includes('no preference');
-    })
-    .filter((meal) => meal.goalTags.includes(goal) || meal.goalTags.includes('feel healthier'))
+    });
+  const goalMatches = dietMatches.filter((meal) => meal.goalTags.includes(goal));
+  return (goalMatches.length > 0 ? goalMatches : dietMatches.filter((meal) => meal.goalTags.includes('feel healthier')))
     .slice(0, 6);
 }
 
@@ -307,10 +307,11 @@ export function getWorkoutSuggestions(preferences: Preferences) {
       : ['mixed'];
   const preferencesText = preferencesList.join(' ').toLowerCase();
   const experience = (preferences.experienceLevel || 'beginner').toLowerCase();
-  return workoutSuggestions
+  const baseMatches = workoutSuggestions
     .filter((workout) => workout.preferenceTags.some((tag) => preferencesText.includes(tag)))
-    .filter((workout) => workout.goalTags.includes(goal) || workout.goalTags.includes('feel healthier'))
-    .filter((workout) => workout.experienceTags.some((tag) => experience.includes(tag) || tag.includes(experience)))
+    .filter((workout) => workout.experienceTags.some((tag) => experience.includes(tag) || tag.includes(experience)));
+  const goalMatches = baseMatches.filter((workout) => workout.goalTags.includes(goal));
+  return (goalMatches.length > 0 ? goalMatches : baseMatches.filter((workout) => workout.goalTags.includes('feel healthier')))
     .slice(0, 8);
 }
 

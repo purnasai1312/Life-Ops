@@ -47,16 +47,30 @@ export default function HabitsScreen() {
   );
 
   const handleDelete = (id: string, title: string) => {
+    const removeHabit = () => {
+      deleteHabit(id).catch((error) => {
+        if (__DEV__) console.warn('Failed to delete habit', error);
+        Alert.alert('Could not remove habit', 'Please try again in a moment.');
+      });
+    };
+
     if (Platform.OS === 'web') {
       if (typeof window !== 'undefined' && window.confirm(`Remove "${title}"?`)) {
-        deleteHabit(id);
+        removeHabit();
       }
       return;
     }
     Alert.alert(`Remove "${title}"?`, 'This will end the ritual.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => deleteHabit(id) },
+      { text: 'Remove', style: 'destructive', onPress: removeHabit },
     ]);
+  };
+
+  const handleToggleHabit = (id: string) => {
+    toggleHabitToday(id).catch((error) => {
+      if (__DEV__) console.warn('Failed to update habit', error);
+      Alert.alert('Could not update habit', 'Please try again in a moment.');
+    });
   };
 
   const totalStreak = habits.reduce((a, h) => a + h.streak, 0);
@@ -273,7 +287,7 @@ export default function HabitsScreen() {
                     </View>
                   </View>
                   <Pressable
-                    onPress={() => toggleHabitToday(h.id)}
+                    onPress={() => handleToggleHabit(h.id)}
                     accessibilityRole="button"
                     accessibilityLabel={
                       doneToday

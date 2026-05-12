@@ -41,13 +41,23 @@ export default function AddHabitModal() {
   const [icon, setIcon] = useState<keyof typeof Ionicons.glyphMap>('leaf-outline');
   const [color, setColor] = useState<AccentColor>('forest');
   const [cadence, setCadence] = useState<HabitCadence>('daily');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const canSave = title.trim().length > 0;
 
-  const save = () => {
-    if (!canSave) return;
-    addHabit({ title, icon, color, cadence });
-    if (router.canGoBack()) router.back(); else router.replace('/(tabs)');
+  const save = async () => {
+    if (!canSave || saving) return;
+    setSaving(true);
+    setError('');
+    try {
+      await addHabit({ title, icon, color, cadence });
+      if (router.canGoBack()) router.back(); else router.replace('/(tabs)');
+    } catch (saveError) {
+      setError((saveError as Error).message || 'Could not create habit. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const pair = accentPair(color);
@@ -237,11 +247,17 @@ export default function AddHabitModal() {
         </ScrollView>
 
           <View style={{ paddingHorizontal: 24, marginTop: 8 }}>
+            {error ? (
+              <Typo variant="caption" color={Colors.error} style={{ marginBottom: 10 }}>
+                {error}
+              </Typo>
+            ) : null}
             <Button
               title="Create habit"
               icon="leaf"
               onPress={save}
-              disabled={!canSave}
+              disabled={!canSave || saving}
+              loading={saving}
               fullWidth
               size="lg"
             />

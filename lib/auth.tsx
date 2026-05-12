@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as WebBrowser from 'expo-web-browser';
 import type { AuthError, Provider, Session, User } from '@supabase/supabase-js';
@@ -27,9 +28,16 @@ interface AuthContextValue {
   signInWithApple: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
+  developerResetSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+const isAuthSessionMissingError = (error: unknown) => {
+  const name = (error as { name?: string } | null)?.name ?? '';
+  const message = (error as { message?: string } | null)?.message ?? '';
+  return name === 'AuthSessionMissingError' || /auth session missing/i.test(message);
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -212,11 +220,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const signOut = async () => {
-    await runAuth(async () => {
+  const clearLocalAuthState = async (clearAllStorage: boolean) => {
+    const { data, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError && !isAuthSessionMissingError(sessionError)) {
+      if (__DEV__) console.info('[Auth] getSession before logout failed:', sessionError.message);
+    }
+
+    if (data?.session) {
       const { error: signOutError } = await supabase.auth.signOut();
-      if (signOutError) throw signOutError;
-    });
+      if (signOutError && !isAuthSessionMissingError(signOutError)) {
+        throw signOutError;
+      }
+      if (__DEV__ && signOutError) {
+        console.info('[Auth] signOut treated as successful:', signOutError.message);
+      }
+    } else if (__DEV__) {
+      console.info('[Auth] logout skipped remote signOut because session is already missing.');
+    }
+
+    if (clearAllStorage) {
+      await AsyncStorage.clear();
+    }
+    setSession(null);
+  };
+
+  const signOut = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await clearLocalAuthState(false);
+    } catch (authError) {
+      if (isAuthSessionMissingError(authError)) {
+        if (__DEV__) console.info('[Auth] missing session during logout treated as success.');
+        setSession(null);
+        return;
+      }
+      setError(authError as AuthError | Error);
+      if (__DEV__) console.info('[Auth] logout failed:', (authError as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const developerResetSession = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await clearLocalAuthState(true);
+    } catch (authError) {
+      if (isAuthSessionMissingError(authError)) {
+        if (__DEV__) console.info('[Auth] missing session during developer reset treated as success.');
+        await AsyncStorage.clear();
+        setSession(null);
+        return;
+      }
+      setError(authError as AuthError | Error);
+      if (__DEV__) console.info('[Auth] developer reset failed:', (authError as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const value = useMemo<AuthContextValue>(
@@ -234,6 +296,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithApple,
       resetPassword,
       signOut,
+      developerResetSession,
     }),
     [error, isLoading, pendingPasswordReset, session]
   );

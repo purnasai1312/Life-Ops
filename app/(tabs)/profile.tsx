@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Screen } from '@/components/screen';
@@ -12,7 +13,8 @@ import { useAuth } from '@/lib/auth';
 import { useAppStore } from '@/store/useAppStore';
 
 export default function ProfileScreen() {
-  const { signOut, user } = useAuth();
+  const router = useRouter();
+  const { signOut, user, developerResetSession } = useAuth();
   const preferences = useAppStore((s) => s.preferences);
   const loadProfile = useAppStore((s) => s.loadProfile);
   const saveProfile = useAppStore((s) => s.saveProfile);
@@ -82,12 +84,20 @@ export default function ProfileScreen() {
   const logout = async () => {
     await signOut();
     resetAll();
+    router.replace('/(auth)/login');
   };
 
   const resetFlow = async () => {
     await resetOnboardingForTesting();
     await signOut();
     resetAll();
+    router.replace('/(auth)/login');
+  };
+
+  const developerReset = async () => {
+    await developerResetSession();
+    resetAll();
+    router.replace('/(auth)/login');
   };
 
   return (
@@ -206,7 +216,12 @@ export default function ProfileScreen() {
               Sign out on this device. Your Supabase-backed meals, workouts, reflections, and profile stay with your account.
             </Typo>
             <Button title="Log out" icon="log-out-outline" variant="destructive" onPress={logout} />
-            <Button title="Reset onboarding test flow" icon="refresh-outline" variant="secondary" onPress={resetFlow} />
+            {__DEV__ ? (
+              <>
+                <Button title="Reset onboarding test flow" icon="refresh-outline" variant="secondary" onPress={resetFlow} />
+                <Button title="Clear local session test state" icon="trash-outline" variant="secondary" onPress={developerReset} />
+              </>
+            ) : null}
           </View>
         </Card>
       </Animated.View>

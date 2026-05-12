@@ -76,6 +76,7 @@ export default function Onboarding() {
   const [intentions, setIntentions] = useState<string[]>(preferences.intentions ?? []);
   const [focusStatement, setFocusStatement] = useState(preferences.focusStatement ?? '');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     if (!name && metadataName) setName(metadataName);
@@ -92,8 +93,10 @@ export default function Onboarding() {
           updated_at: new Date().toISOString(),
         });
         if (error) throw error;
-      } catch {
-        // Onboarding can continue locally if remote profile creation is unavailable.
+      } catch (error) {
+        if (__DEV__) {
+          console.info('[Onboarding] initial profile upsert failed:', (error as Error).message);
+        }
       }
     };
     initializeProfile();
@@ -110,7 +113,8 @@ export default function Onboarding() {
 
   const onboardedForThisUser =
     preferences.hasCompletedOnboarding &&
-    (!user?.id || !preferences.userId || preferences.userId === user.id) &&
+    Boolean(user?.id) &&
+    preferences.userId === user?.id &&
     Boolean(preferences.name?.trim()) &&
     Boolean(preferences.goal) &&
     Boolean(preferences.workoutPreferences?.length || preferences.workoutPreference) &&
@@ -119,15 +123,21 @@ export default function Onboarding() {
     Boolean(preferences.proteinTarget);
 
   if (isLoading) {
-    return null;
+    return (
+      <View style={{ flex: 1, backgroundColor: Colors.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <Typo variant="eyebrow" color={Colors.inkMuted}>
+          Checking session
+        </Typo>
+      </View>
+    );
+  }
+
+  if (!isAuthenticated || !user?.id) {
+    return <Redirect href="/(auth)/login" />;
   }
 
   if (onboardedForThisUser) {
     return <Redirect href="/(tabs)" />;
-  }
-
-  if (!isAuthenticated) {
-    return <Redirect href="/(auth)/login" />;
   }
 
   const totalSteps = 9;
@@ -148,7 +158,7 @@ export default function Onboarding() {
   };
 
   const saveProfileToSupabase = async () => {
-    if (!user?.id) return;
+    if (!user?.id) throw new Error('You need to be signed in to finish onboarding.');
     const profile = {
       id: user.id,
       name: name.trim(),
@@ -208,6 +218,10 @@ export default function Onboarding() {
     if (onboardingError && !isMissingSupabaseTableError(onboardingError)) {
       throw onboardingError;
     }
+
+    if (__DEV__) {
+      console.info('[Onboarding] saved onboarding_complete value:', true, 'user id:', user.id);
+    }
   };
 
   const next = async () => {
@@ -218,31 +232,32 @@ export default function Onboarding() {
     }
 
     setSaving(true);
-    completeOnboarding({
-      userId: user?.id,
-      name,
-      age,
-      height,
-      weight,
-      goal,
-      activityLevel,
-      dietPreference,
-      workoutPreference: workoutPreferences[0] ?? '',
-      workoutPreferences,
-      experienceLevel,
-      calorieTarget,
-      proteinTarget,
-      waterTarget,
-      workoutFrequencyGoal,
-      movementGoal,
-      habitPriorities,
-      selectedGoals,
-      habits,
-      intentions,
-      focusStatement,
-    });
+    setSaveError('');
     try {
       await saveProfileToSupabase();
+      completeOnboarding({
+        userId: user.id,
+        name,
+        age,
+        height,
+        weight,
+        goal,
+        activityLevel,
+        dietPreference,
+        workoutPreference: workoutPreferences[0] ?? '',
+        workoutPreferences,
+        experienceLevel,
+        calorieTarget,
+        proteinTarget,
+        waterTarget,
+        workoutFrequencyGoal,
+        movementGoal,
+        habitPriorities,
+        selectedGoals,
+        habits,
+        intentions,
+        focusStatement,
+      });
       const templates = getSuggestedGoalTemplates({
         goal,
         proteinTarget,
@@ -251,12 +266,20 @@ export default function Onboarding() {
         movementGoal,
         workoutFrequencyGoal,
       }).filter((template) => selectedGoals.includes(template.key));
-      await addGoalTemplates(templates);
-    } catch {
-      // Local onboarding is still persisted; remote profile can sync later.
+      await addGoalTemplates(templates).catch((error) => {
+        if (__DEV__) {
+          console.info('[Onboarding] goal template creation failed:', (error as Error).message);
+        }
+      });
+      router.replace('/(tabs)');
+    } catch (error) {
+      const message = (error as Error).message || 'Onboarding could not be saved. Please try again.';
+      setSaveError(message);
+      if (__DEV__) {
+        console.info('[Onboarding] completion save failed:', message);
+      }
     } finally {
       setSaving(false);
-      router.replace('/(tabs)');
     }
   };
 
@@ -457,6 +480,11 @@ export default function Onboarding() {
               </Step>
 
               <Animated.View entering={FadeIn.duration(250)}>
+                {saveError ? (
+                  <Typo variant="caption" color={Colors.error} style={{ marginBottom: 10 }}>
+                    {saveError}
+                  </Typo>
+                ) : null}
                 <Button
                   title={step === totalSteps - 1 ? 'Begin' : 'Continue'}
                   iconRight={step === totalSteps - 1 ? 'sparkles' : 'arrow-forward'}

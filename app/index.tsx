@@ -53,7 +53,7 @@ export default function SplashScreen() {
       } else {
         getPostAuthRedirect()
           .then((nextRoute) => setRedirect(nextRoute))
-          .catch(() => setRedirect('/onboarding'));
+          .catch(() => setRedirect('/(auth)/login'));
       }
     }, 1600);
     return () => clearTimeout(t);

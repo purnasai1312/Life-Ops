@@ -15,12 +15,14 @@ import { Fonts } from '@/constants/Typography';
 import { useAppStore, getTodayISO } from '@/store/useAppStore';
 import { accentPair } from '@/utils/colors';
 import { lastNDates, dayLetter } from '@/utils/date';
+import { GoalsContent } from './goals';
 
 export default function HabitsScreen() {
   const router = useRouter();
   const habits = useAppStore((s) => s.habits);
   const toggleHabitToday = useAppStore((s) => s.toggleHabitToday);
   const deleteHabit = useAppStore((s) => s.deleteHabit);
+  const [section, setSection] = useState<'habits' | 'goals'>('habits');
   const [range, setRange] = useState<'today' | '7' | '30'>('7');
 
   const today = getTodayISO();
@@ -80,7 +82,7 @@ export default function HabitsScreen() {
     <Screen>
       <Animated.View entering={FadeInDown.duration(500)} style={{ gap: 6 }}>
         <Typo variant="eyebrow" color={Colors.accent}>
-          Rituals · the quiet work
+          Rituals · goals
         </Typo>
         <Typo
           style={{
@@ -106,10 +108,16 @@ export default function HabitsScreen() {
           </Typo>
         </Typo>
         <Typo variant="body" style={{ marginTop: 4 }}>
-          Small motions, repeated. The shape of who you&apos;re becoming.
+          Small motions and long arcs, kept in one calm place.
         </Typo>
       </Animated.View>
 
+      <Segmented options={['habits', 'goals'] as const} value={section} onChange={setSection} />
+
+      {section === 'goals' ? (
+        <GoalsContent showHeader={false} />
+      ) : (
+      <>
       {habits.length > 0 ? (
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
           <Card tone="muted" padding={18}>
@@ -335,6 +343,8 @@ export default function HabitsScreen() {
             />
           </View>
         </View>
+      )}
+      </>
       )}
     </Screen>
   );

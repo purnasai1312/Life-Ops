@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Pressable, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,27 +18,65 @@ import { GOAL_CATEGORY_META } from '@/utils/goals';
 import { daysUntil, formatShortDate } from '@/utils/date';
 
 export default function GoalsScreen() {
+  return (
+    <Screen>
+      <GoalsContent />
+    </Screen>
+  );
+}
+
+export function GoalsContent({ showHeader = true }: { showHeader?: boolean }) {
   const router = useRouter();
   const goals = useAppStore((s) => s.goals);
   const loadGoals = useAppStore((s) => s.loadGoals);
   const incrementGoal = useAppStore((s) => s.incrementGoal);
   const deleteGoal = useAppStore((s) => s.deleteGoal);
+  const [busyGoalId, setBusyGoalId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     loadGoals().catch(() => {});
   }, [loadGoals]);
 
   const handleDelete = (id: string, title: string) => {
+    const run = async () => {
+      setBusyGoalId(id);
+      setFeedback(null);
+      try {
+        await deleteGoal(id);
+        setFeedback({ type: 'success', message: 'Goal removed.' });
+      } catch (error) {
+        if (__DEV__) console.warn('Goal delete failed', error);
+        setFeedback({ type: 'error', message: 'Could not remove goal. Please try again.' });
+      } finally {
+        setBusyGoalId(null);
+      }
+    };
+
     if (Platform.OS === 'web') {
       if (typeof window !== 'undefined' && window.confirm(`Remove "${title}"?`)) {
-        deleteGoal(id).catch(() => {});
+        run();
       }
       return;
     }
     Alert.alert(`Remove "${title}"?`, undefined, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => deleteGoal(id).catch(() => {}) },
+      { text: 'Remove', style: 'destructive', onPress: run },
     ]);
+  };
+
+  const handleIncrement = async (id: string, delta: number) => {
+    setBusyGoalId(id);
+    setFeedback(null);
+    try {
+      await incrementGoal(id, delta);
+      setFeedback({ type: 'success', message: delta > 0 ? 'Progress logged.' : 'Progress updated.' });
+    } catch (error) {
+      if (__DEV__) console.warn('Goal progress update failed', error);
+      setFeedback({ type: 'error', message: 'Could not update progress. Please try again.' });
+    } finally {
+      setBusyGoalId(null);
+    }
   };
 
   const totalProgress =
@@ -48,7 +86,8 @@ export default function GoalsScreen() {
         goals.length;
 
   return (
-    <Screen>
+    <>
+      {showHeader ? (
       <Animated.View entering={FadeInDown.duration(500)} style={{ gap: 6 }}>
         <Typo variant="eyebrow" color={Colors.accent}>
           Horizons · long arcs
@@ -77,6 +116,7 @@ export default function GoalsScreen() {
           </Typo>
         </Typo>
       </Animated.View>
+      ) : null}
 
       {goals.length > 0 ? (
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
@@ -111,6 +151,12 @@ export default function GoalsScreen() {
             </View>
           </Card>
         </Animated.View>
+      ) : null}
+
+      {feedback ? (
+        <Typo variant="caption" color={feedback.type === 'error' ? Colors.error : Colors.forest}>
+          {feedback.message}
+        </Typo>
       ) : null}
 
       {goals.length === 0 ? (
@@ -204,10 +250,11 @@ export default function GoalsScreen() {
                       </View>
                       <Pressable
                         onPress={() => handleDelete(g.id, g.title)}
+                        disabled={busyGoalId === g.id}
                         hitSlop={10}
                         style={({ pressed }) => ({
                           padding: 6,
-                          opacity: pressed ? 0.5 : 1,
+                          opacity: busyGoalId === g.id ? 0.4 : pressed ? 0.5 : 1,
                         })}
                         accessibilityLabel={`Remove ${g.title}`}
                       >
@@ -287,15 +334,16 @@ export default function GoalsScreen() {
                   >
                     <StepButton
                       icon="remove"
-                      disabled={g.progress === 0}
-                      onPress={() => incrementGoal(g.id, -1).catch(() => {})}
+                      disabled={g.progress === 0 || busyGoalId === g.id}
+                      onPress={() => handleIncrement(g.id, -1)}
                       side="left"
                     />
                     <View style={{ width: 1, backgroundColor: Colors.borderSoft }} />
                     <StepButton
                       icon="add"
                       label="Log progress"
-                      onPress={() => incrementGoal(g.id, 1).catch(() => {})}
+                      disabled={busyGoalId === g.id}
+                      onPress={() => handleIncrement(g.id, 1)}
                       color={pair.ink}
                       background={pair.soft}
                       side="right"
@@ -315,7 +363,7 @@ export default function GoalsScreen() {
           </View>
         </View>
       )}
-    </Screen>
+    </>
   );
 }
 

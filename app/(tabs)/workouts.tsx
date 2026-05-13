@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Screen } from '@/components/screen';
@@ -13,6 +14,7 @@ import { getTodayISO, useAppStore } from '@/store/useAppStore';
 import type { WorkoutLog, WorkoutType } from '@/store/types';
 import { formatShortDate, lastNDates } from '@/utils/date';
 import { getWorkoutSuggestions } from '@/utils/suggestions';
+import { getWorkoutDetailRoute } from '@/utils/lifeops-logic';
 
 const WORKOUT_TYPES: WorkoutType[] = ['gym', 'home', 'cardio', 'walking', 'rest day'];
 
@@ -27,6 +29,7 @@ const emptyForm = {
 };
 
 export default function WorkoutsScreen() {
+  const router = useRouter();
   const preferences = useAppStore((s) => s.preferences);
   const workouts = useAppStore((s) => s.workouts);
   const loadWorkouts = useAppStore((s) => s.loadWorkouts);
@@ -37,6 +40,8 @@ export default function WorkoutsScreen() {
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState<WorkoutLog | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [tab, setTab] = useState<'suggested' | 'today' | 'history'>('suggested');
   const [range, setRange] = useState<'7' | '30'>('7');
 
@@ -72,6 +77,11 @@ export default function WorkoutsScreen() {
   };
 
   const submit = async () => {
+    setFeedback(null);
+    if (form.workoutType !== 'rest day' && !form.durationMinutes.trim()) {
+      setFeedback({ type: 'error', message: 'Add a duration or choose rest day.' });
+      return;
+    }
     setSaving(true);
     const payload = {
       workoutType: form.workoutType,
@@ -89,7 +99,11 @@ export default function WorkoutsScreen() {
       } else {
         await addWorkout(payload);
       }
+      setFeedback({ type: 'success', message: editing ? 'Workout updated.' : 'Workout logged.' });
       reset();
+    } catch (error) {
+      if (__DEV__) console.warn('Workout save failed', error);
+      setFeedback({ type: 'error', message: 'Could not save workout. Please try again.' });
     } finally {
       setSaving(false);
     }
@@ -109,7 +123,19 @@ export default function WorkoutsScreen() {
   };
 
   const remove = (workout: WorkoutLog) => {
-    const run = () => deleteWorkout(workout.id).catch(() => {});
+    const run = async () => {
+      setDeletingId(workout.id);
+      setFeedback(null);
+      try {
+        await deleteWorkout(workout.id);
+        setFeedback({ type: 'success', message: 'Workout deleted.' });
+      } catch (error) {
+        if (__DEV__) console.warn('Workout delete failed', error);
+        setFeedback({ type: 'error', message: 'Could not delete workout. Please try again.' });
+      } finally {
+        setDeletingId(null);
+      }
+    };
     if (Platform.OS === 'web') {
       if (typeof window !== 'undefined' && window.confirm(`Delete ${workout.workoutType}?`)) run();
       return;
@@ -191,6 +217,12 @@ export default function WorkoutsScreen() {
         onChange={setTab}
       />
 
+      {feedback ? (
+        <Typo variant="caption" color={feedback.type === 'error' ? Colors.error : Colors.forest}>
+          {feedback.message}
+        </Typo>
+      ) : null}
+
       {tab === 'suggested' ? (
         <Animated.View entering={FadeInDown.delay(125).duration(500)} style={{ gap: 12 }}>
           <View style={{ gap: 4 }}>
@@ -203,7 +235,12 @@ export default function WorkoutsScreen() {
           </View>
           <View style={{ gap: 10 }}>
             {suggestions.map((workout) => (
-              <Card key={workout.title} padding={16}>
+              <Pressable
+                key={workout.id}
+                onPress={() => router.push(getWorkoutDetailRoute(workout.id) as never)}
+                style={({ pressed }) => ({ opacity: pressed ? 0.82 : 1 })}
+              >
+              <Card padding={16}>
                 <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
                   <View style={{ flex: 1, gap: 4 }}>
                     <Typo variant="bodyEmphasis">{workout.title}</Typo>
@@ -213,24 +250,15 @@ export default function WorkoutsScreen() {
                     <Typo variant="caption">{workout.prescription}</Typo>
                   </View>
                   <Button
-                    title="Add"
-                    icon="add"
+                    title="View"
+                    icon="chevron-forward"
                     size="sm"
                     variant="secondary"
-                    onPress={() =>
-                      addWorkout({
-                        workoutType: workout.workoutType,
-                        durationMinutes: workout.durationMinutes,
-                        exerciseName: workout.exerciseName,
-                        sets: workout.sets,
-                        reps: workout.reps,
-                        notes: workout.notes,
-                        date: today,
-                      }).catch(() => {})
-                    }
+                    onPress={() => router.push(getWorkoutDetailRoute(workout.id) as never)}
                   />
                 </View>
               </Card>
+              </Pressable>
             ))}
           </View>
         </Animated.View>
@@ -285,6 +313,7 @@ export default function WorkoutsScreen() {
                 icon={editing ? 'checkmark' : 'add'}
                 onPress={submit}
                 loading={saving}
+                disabled={form.workoutType !== 'rest day' && !form.durationMinutes.trim()}
                 fullWidth
               />
               {editing ? <Button title="Cancel" variant="secondary" onPress={reset} /> : null}
@@ -303,12 +332,13 @@ export default function WorkoutsScreen() {
             <EmptyState
               icon="barbell-outline"
               title="No workout logged today"
-              description="Log a workout manually, add a suggestion, or mark a rest day."
+              description="Log a workout manually, review a suggestion, or mark a rest day."
+              cta={{ label: 'Choose a suggestion', icon: 'sparkles-outline', onPress: () => setTab('suggested') }}
             />
           ) : (
             <View style={{ gap: 10 }}>
               {todayWorkouts.map((workout) => (
-                <WorkoutCard key={workout.id} workout={workout} onEdit={startEdit} onDelete={remove} />
+                <WorkoutCard key={workout.id} workout={workout} onEdit={startEdit} onDelete={remove} deleting={deletingId === workout.id} />
               ))}
             </View>
           )}
@@ -328,6 +358,7 @@ export default function WorkoutsScreen() {
             icon="barbell-outline"
             title="No workout logged"
             description="Add a workout, walk, or rest day to make today&apos;s movement real."
+            cta={{ label: 'Log workout', icon: 'add', onPress: () => setTab('today') }}
           />
         ) : (
           <View style={{ gap: 10 }}>
@@ -379,7 +410,7 @@ function Segmented<T extends string>({ options, value, onChange }: { options: re
   );
 }
 
-function WorkoutCard({ workout, onEdit, onDelete, flat }: { workout: WorkoutLog; onEdit: (workout: WorkoutLog) => void; onDelete: (workout: WorkoutLog) => void; flat?: boolean }) {
+function WorkoutCard({ workout, onEdit, onDelete, flat, deleting }: { workout: WorkoutLog; onEdit: (workout: WorkoutLog) => void; onDelete: (workout: WorkoutLog) => void; flat?: boolean; deleting?: boolean }) {
   const content = (
     <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
       <View
@@ -408,11 +439,11 @@ function WorkoutCard({ workout, onEdit, onDelete, flat }: { workout: WorkoutLog;
         ) : null}
         {workout.notes ? <Typo variant="caption">{workout.notes}</Typo> : null}
       </View>
-      <Pressable onPress={() => onEdit(workout)} hitSlop={8} style={{ padding: 4 }}>
+      <Pressable onPress={() => onEdit(workout)} disabled={deleting} hitSlop={8} style={{ padding: 4, opacity: deleting ? 0.4 : 1 }}>
         <Ionicons name="create-outline" size={18} color={Colors.inkMuted} />
       </Pressable>
-      <Pressable onPress={() => onDelete(workout)} hitSlop={8} style={{ padding: 4 }}>
-        <Ionicons name="trash-outline" size={18} color={Colors.inkMuted} />
+      <Pressable onPress={() => onDelete(workout)} disabled={deleting} hitSlop={8} style={{ padding: 4, opacity: deleting ? 0.4 : 1 }}>
+        <Ionicons name={deleting ? 'hourglass-outline' : 'trash-outline'} size={18} color={Colors.inkMuted} />
       </Pressable>
     </View>
   );

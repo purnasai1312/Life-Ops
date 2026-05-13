@@ -69,7 +69,6 @@ export function buildProfileUpsertPayload(userId: string, profile: OnboardingPro
     goal: profile.goal,
     activity_level: profile.activityLevel,
     diet_preference: profile.dietPreference,
-    workout_preference: profile.workoutPreferences[0] ?? profile.workoutPreference,
     workout_preferences: profile.workoutPreferences,
     experience_level: profile.experienceLevel,
     calorie_target: roundNonNegative(profile.calorieTarget),
@@ -95,7 +94,6 @@ export function buildOnboardingUpsertPayload(userId: string, profile: Onboarding
     goal: profile.goal,
     activity_level: profile.activityLevel,
     diet_preference: profile.dietPreference,
-    workout_preference: profile.workoutPreferences[0] ?? profile.workoutPreference,
     workout_preferences: profile.workoutPreferences,
     experience_level: profile.experienceLevel,
     calorie_target: roundNonNegative(profile.calorieTarget),
@@ -149,6 +147,9 @@ export function buildMealInsertPayload(userId: string, input: {
   fatG?: number;
   notes?: string;
   date?: string;
+  source?: 'manual' | 'suggested';
+  templateId?: string;
+  loggedAt?: string;
 }) {
   return {
     user_id: userId,
@@ -160,6 +161,11 @@ export function buildMealInsertPayload(userId: string, input: {
     protein_g: toNumber(input.proteinG),
     carbs_g: toNumber(input.carbsG),
     fat_g: toNumber(input.fatG),
+    metadata: {
+      source: input.source ?? 'manual',
+      template_id: input.templateId ?? null,
+      logged_at: input.loggedAt ?? null,
+    },
   };
 }
 
@@ -205,6 +211,8 @@ export function mealSuggestionToMealInput(suggestion: MealSuggestion, date = tod
     fatG: suggestion.fatG,
     notes: suggestion.notes,
     date,
+    source: 'suggested',
+    templateId: suggestion.id,
   });
 }
 
@@ -217,6 +225,12 @@ export function buildWorkoutInsertPayload(userId: string, input: {
   weight?: number;
   notes?: string;
   date?: string;
+  source?: 'manual' | 'suggested';
+  templateId?: string;
+  completedStepsCount?: number;
+  totalStepsCount?: number;
+  estimatedCalories?: number;
+  completedAt?: string;
 }) {
   return {
     workout: {
@@ -224,8 +238,16 @@ export function buildWorkoutInsertPayload(userId: string, input: {
       title: input.workoutType === 'rest day' ? 'Rest day' : `${input.workoutType} workout`,
       workout_type: input.workoutType,
       scheduled_for: input.date || todayISO(),
+      completed_at: input.completedAt ?? null,
       duration_minutes: roundNonNegative(input.durationMinutes),
       notes: input.notes?.trim() || null,
+      metadata: {
+        source: input.source ?? 'manual',
+        template_id: input.templateId ?? null,
+        completed_steps_count: input.completedStepsCount ?? null,
+        total_steps_count: input.totalStepsCount ?? null,
+        estimated_calories: input.estimatedCalories ?? null,
+      },
     },
     entry: input.exerciseName?.trim()
       ? {
@@ -250,6 +272,7 @@ export function buildWorkoutUpdatePayload(input: Partial<WorkoutLog>) {
 }
 
 export function workoutSuggestionToWorkoutInput(suggestion: WorkoutSuggestion, date = todayISO()) {
+  const completedAt = new Date(`${date}T12:00:00.000Z`).toISOString();
   return buildWorkoutInsertPayload('', {
     workoutType: suggestion.workoutType,
     durationMinutes: suggestion.durationMinutes,
@@ -258,7 +281,26 @@ export function workoutSuggestionToWorkoutInput(suggestion: WorkoutSuggestion, d
     reps: suggestion.reps,
     notes: suggestion.notes,
     date,
+    source: 'suggested',
+    templateId: suggestion.id,
+    completedStepsCount: suggestion.steps.length,
+    totalStepsCount: suggestion.steps.length,
+    estimatedCalories: Math.round((suggestion.estimatedCaloriesMin + suggestion.estimatedCaloriesMax) / 2),
+    completedAt,
   });
+}
+
+export function getMealDetailRoute(id: string) {
+  return { pathname: '/meal-detail', params: { id } };
+}
+
+export function getWorkoutDetailRoute(id: string) {
+  return { pathname: '/workout-detail', params: { id } };
+}
+
+export function calculateChecklistProgress(completedCount: number, totalCount: number) {
+  if (totalCount <= 0) return 0;
+  return clampPercentage((completedCount / totalCount) * 100);
 }
 
 export function buildHabitInsertPayload(userId: string, input: Pick<Habit, 'title' | 'icon' | 'color' | 'cadence'>) {
@@ -385,7 +427,6 @@ export function buildProfileUpdatePayload(userId: string, preferences: Partial<P
     name: preferences.name?.trim() || null,
     goal: preferences.goal?.trim() || null,
     diet_preference: preferences.dietPreference?.trim() || null,
-    workout_preference: preferences.workoutPreferences?.[0] ?? preferences.workoutPreference ?? null,
     workout_preferences: preferences.workoutPreferences ?? (preferences.workoutPreference ? [preferences.workoutPreference] : []),
     habit_priorities: preferences.habitPriorities ?? [],
     selected_goals: preferences.selectedGoals ?? [],

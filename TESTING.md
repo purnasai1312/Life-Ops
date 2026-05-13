@@ -52,7 +52,10 @@ Use a fresh test user when possible. For production-like testing, run the curren
 - Set diet to vegan; confirm suggestions contain no meat, fish, eggs, dairy, whey, or animal products.
 - Set diet to vegetarian; confirm suggestions contain no meat or fish.
 - Set goal to lose weight, gain muscle, maintain, and feel healthier; confirm suggestions shift appropriately.
-- Quick-add a suggested meal and confirm it appears in Today.
+- Tap any suggested meal; confirm the Recipe screen opens and no meal is logged yet.
+- Use Back/Cancel from the Recipe screen; confirm no meal is logged.
+- Tap Add to Today; confirm exactly one meal appears in Today and dashboard calories/protein update.
+- Confirm every suggested meal shows nutrition, ingredients, instructions, substitutions, and notes without broken images.
 
 ## Workouts
 - Add a workout manually.
@@ -63,7 +66,12 @@ Use a fresh test user when possible. For production-like testing, run the curren
 ## Workout Suggestions
 - Change goal, workout preferences, and experience level.
 - Confirm suggested workouts filter by those values.
-- Quick-add a suggested workout and confirm it appears in Today.
+- Tap any suggested workout; confirm the Workout Detail screen opens and no workout is logged yet.
+- Check and uncheck workout steps; confirm progress updates.
+- Start, pause, and reset a duration/rest timer.
+- Use Back/Cancel from the detail screen; confirm no workout is logged.
+- Tap Complete Workout; confirm exactly one workout appears in Today and the Today dashboard updates.
+- Confirm every suggested workout shows duration, calories, equipment, benefits, and step instructions without broken images.
 
 ## Habits
 - Create a habit.

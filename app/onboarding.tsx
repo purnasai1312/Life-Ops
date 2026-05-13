@@ -168,7 +168,6 @@ export default function Onboarding() {
       goal,
       activity_level: activityLevel,
       diet_preference: dietPreference,
-      workout_preference: workoutPreferences[0] ?? null,
       workout_preferences: workoutPreferences,
       experience_level: experienceLevel,
       calorie_target: Number(calorieTarget) || null,
@@ -192,7 +191,6 @@ export default function Onboarding() {
       goal,
       activity_level: activityLevel,
       diet_preference: dietPreference,
-      workout_preference: workoutPreferences[0] ?? null,
       workout_preferences: workoutPreferences,
       experience_level: experienceLevel,
       calorie_target: Number(calorieTarget) || null,
@@ -290,19 +288,18 @@ export default function Onboarding() {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1, backgroundColor: Colors.bg }}
       >
         <ScrollView
           alwaysBounceVertical
-          automaticallyAdjustKeyboardInsets
-          keyboardDismissMode="interactive"
+          keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             flexGrow: 1,
             paddingTop: insets.top + 12,
-            paddingBottom: insets.bottom + 28,
+            paddingBottom: insets.bottom + (step === totalSteps - 1 ? 16 : 28),
             paddingHorizontal: 22,
           }}
         >
@@ -472,8 +469,13 @@ export default function Onboarding() {
                       placeholder="Write a single line..."
                       value={focusStatement}
                       onChangeText={setFocusStatement}
-                      multiline
                       autoFocus
+                      returnKeyType="done"
+                      blurOnSubmit
+                      onSubmitEditing={() => {
+                        Keyboard.dismiss();
+                        if (canNext) void next();
+                      }}
                     />
                   </>
                 ) : null}

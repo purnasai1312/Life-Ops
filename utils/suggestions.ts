@@ -1,7 +1,10 @@
 import type { MealType, Preferences, WorkoutType } from '@/store/types';
 
 export type MealSuggestion = {
+  id: string;
+  name: string;
   title: string;
+  category: string;
   mealType: MealType;
   dietTags: string[];
   goalTags: string[];
@@ -9,10 +12,36 @@ export type MealSuggestion = {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  prepTimeMinutes: number;
+  cookTimeMinutes: number;
+  servingSize: string;
+  description: string;
+  ingredients: string[];
+  instructions: string[];
+  substitutions?: string[];
+  imageKey?: string;
+  illustrationKey?: string;
   notes: string;
 };
 
+export type WorkoutStep = {
+  id: string;
+  name: string;
+  instruction: string;
+  type: 'reps' | 'duration' | 'hold' | 'rest';
+  sets?: number;
+  reps?: number;
+  durationSeconds?: number;
+  restSeconds?: number;
+  imageKey?: string;
+  illustrationKey?: string;
+};
+
 export type WorkoutSuggestion = {
+  id: string;
   title: string;
   category:
     | 'weight loss'
@@ -28,6 +57,13 @@ export type WorkoutSuggestion = {
   experienceTags: string[];
   durationMinutes: number;
   difficulty: 'beginner' | 'intermediate' | 'advanced';
+  estimatedCaloriesMin: number;
+  estimatedCaloriesMax: number;
+  equipment: string[];
+  targetMuscles: string[];
+  benefits: string[];
+  description: string;
+  steps: WorkoutStep[];
   exercises: string[];
   prescription: string;
   estimatedCaloriesRange: [number, number];
@@ -37,7 +73,25 @@ export type WorkoutSuggestion = {
   notes: string;
 };
 
-const mealSuggestions: MealSuggestion[] = [
+type RawMealSuggestion = Omit<
+  MealSuggestion,
+  | 'id'
+  | 'name'
+  | 'title'
+  | 'category'
+  | 'protein'
+  | 'carbs'
+  | 'fat'
+  | 'prepTimeMinutes'
+  | 'cookTimeMinutes'
+  | 'servingSize'
+  | 'description'
+  | 'ingredients'
+  | 'instructions'
+  | 'substitutions'
+> & { title: string };
+
+const rawMealSuggestions: RawMealSuggestion[] = [
   {
     title: 'Tofu veggie bowl',
     mealType: 'lunch',
@@ -205,7 +259,7 @@ const mealSuggestions: MealSuggestion[] = [
   },
 ];
 
-const workoutSuggestions: WorkoutSuggestion[] = [
+const rawWorkoutSuggestions = [
   workout('Brisk walking intervals', 'weight loss', 'walking', ['walking', 'mixed', 'home', 'gym'], ['lose weight', 'feel healthier', 'maintain'], ['beginner', 'intermediate', 'advanced'], 35, 'beginner', ['Warm-up walk', 'Brisk intervals', 'Easy walk'], '3 min easy + 1 min brisk x 7', [160, 260], 'Walk intervals'),
   workout('Low-impact cardio circuit', 'weight loss', 'cardio', ['home', 'gym', 'mixed'], ['lose weight'], ['beginner', 'intermediate'], 30, 'beginner', ['Marching', 'Step jacks', 'Bodyweight squats', 'Shadow boxing'], '4 rounds, 45 sec each', [180, 300], 'Low impact circuit', 4, 12),
   workout('Incline walk plus core', 'weight loss', 'cardio', ['gym', 'walking', 'mixed'], ['lose weight', 'feel healthier'], ['beginner', 'intermediate'], 40, 'beginner', ['Incline walk', 'Dead bug', 'Side plank'], '30 min walk + 2 core rounds', [220, 360], 'Incline walk'),
@@ -251,7 +305,17 @@ function workout(
   exerciseName?: string,
   sets?: number,
   reps?: number
-): WorkoutSuggestion {
+): Omit<
+  WorkoutSuggestion,
+  | 'id'
+  | 'estimatedCaloriesMin'
+  | 'estimatedCaloriesMax'
+  | 'equipment'
+  | 'targetMuscles'
+  | 'benefits'
+  | 'description'
+  | 'steps'
+> {
   return {
     title,
     category,
@@ -270,6 +334,131 @@ function workout(
     notes: `${prescription}. ${exercises.join(', ')}.`,
   };
 }
+
+const slugify = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+
+const sentence = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
+const mealSuggestions: MealSuggestion[] = rawMealSuggestions.map((meal) => ({
+  ...meal,
+  id: `meal-${slugify(meal.title)}`,
+  name: meal.title,
+  category: meal.mealType,
+  protein: meal.proteinG,
+  carbs: meal.carbsG,
+  fat: meal.fatG,
+  prepTimeMinutes: meal.mealType === 'snack' || meal.mealType === 'breakfast' ? 8 : 12,
+  cookTimeMinutes: meal.mealType === 'snack' ? 0 : meal.mealType === 'breakfast' ? 8 : 18,
+  servingSize: '1 serving',
+  description: meal.notes,
+  ingredients: meal.notes
+    .replace(/\.$/, '')
+    .split(/,| and /)
+    .map((item) => item.trim())
+    .filter(Boolean),
+  instructions: [
+    'Gather and portion the ingredients.',
+    meal.mealType === 'snack'
+      ? 'Combine everything in a bowl or blender.'
+      : 'Cook or warm the main ingredients until ready.',
+    'Season simply, plate, and log the meal when you eat it.',
+  ],
+  substitutions: meal.dietTags.includes('vegan')
+    ? ['Swap grains or beans based on what you have ready.', 'Use soy, pea, tofu, tempeh, beans, lentils, nuts, or seeds for protein.']
+    : ['Adjust the carb portion to match your target.', 'Use a similar protein source that fits your diet preference.'],
+  illustrationKey: `meal-${slugify(meal.mealType)}`,
+}));
+
+const inferEquipment = (workout: { workoutType: WorkoutType; preferenceTags: string[]; exercises: string[] }) => {
+  const text = `${workout.workoutType} ${workout.preferenceTags.join(' ')} ${workout.exercises.join(' ')}`.toLowerCase();
+  if (text.includes('gym') || text.includes('machine') || text.includes('cable') || text.includes('lat pulldown')) return ['Gym equipment'];
+  if (text.includes('dumbbell')) return ['Dumbbells'];
+  if (text.includes('kettlebell')) return ['Kettlebell'];
+  if (text.includes('walk') || text.includes('running')) return ['Comfortable shoes'];
+  return ['Bodyweight'];
+};
+
+const inferTargets = (category: WorkoutSuggestion['category'], workoutType: WorkoutType) => {
+  if (category === 'muscle gain' || workoutType === 'gym') return ['Full body', 'Strength'];
+  if (category === 'walking/cardio' || workoutType === 'walking' || workoutType === 'cardio') return ['Heart health', 'Legs'];
+  if (category === 'mobility/recovery') return ['Mobility', 'Recovery'];
+  return ['Full body', 'Core'];
+};
+
+const buildSteps = (
+  workout: Omit<
+    WorkoutSuggestion,
+    | 'id'
+    | 'estimatedCaloriesMin'
+    | 'estimatedCaloriesMax'
+    | 'equipment'
+    | 'targetMuscles'
+    | 'benefits'
+    | 'description'
+    | 'steps'
+  >
+): WorkoutStep[] => {
+  const base = workout.exercises.length > 0 ? workout.exercises : [workout.title];
+  const isDuration = workout.workoutType === 'walking' || workout.workoutType === 'cardio' || /walk|bike|elliptical|mobility|yoga|stretch|breathing/i.test(workout.prescription);
+  if (isDuration) {
+    const activeSeconds = Math.max(300, Math.round((workout.durationMinutes * 60) / Math.max(base.length, 1)));
+    return [
+      {
+        id: `${slugify(workout.title)}-warmup`,
+        name: 'Warm-up',
+        instruction: 'Start easy and settle into steady breathing.',
+        type: 'duration',
+        durationSeconds: Math.min(300, activeSeconds),
+        illustrationKey: 'warmup',
+      },
+      ...base.map((name, index) => ({
+        id: `${slugify(workout.title)}-${index + 1}`,
+        name,
+        instruction: `${sentence(name.toLowerCase())}. Keep the effort controlled and repeatable.`,
+        type: /stretch|breathing|plank|hold/i.test(name) ? 'hold' as const : 'duration' as const,
+        durationSeconds: activeSeconds,
+        restSeconds: index < base.length - 1 ? 30 : undefined,
+        illustrationKey: slugify(name),
+      })),
+      {
+        id: `${slugify(workout.title)}-cooldown`,
+        name: 'Cooldown',
+        instruction: 'Ease down and finish with relaxed breathing.',
+        type: 'duration',
+        durationSeconds: 180,
+        illustrationKey: 'cooldown',
+      },
+    ];
+  }
+
+  return base.map((name, index) => ({
+    id: `${slugify(workout.title)}-${index + 1}`,
+    name,
+    instruction: `${sentence(name.toLowerCase())}. Move with control and stop before form breaks.`,
+    type: /plank|wall sit|carry/i.test(name) ? 'hold' : 'reps',
+    sets: workout.sets ?? 3,
+    reps: /plank|wall sit|carry/i.test(name) ? undefined : workout.reps ?? 10,
+    durationSeconds: /plank|wall sit|carry/i.test(name) ? 45 : undefined,
+    restSeconds: 45,
+    illustrationKey: slugify(name),
+  }));
+};
+
+const workoutSuggestions: WorkoutSuggestion[] = rawWorkoutSuggestions.map((workout) => ({
+  ...workout,
+  id: `workout-${slugify(workout.title)}`,
+  estimatedCaloriesMin: workout.estimatedCaloriesRange[0],
+  estimatedCaloriesMax: workout.estimatedCaloriesRange[1],
+  equipment: inferEquipment(workout),
+  targetMuscles: inferTargets(workout.category, workout.workoutType),
+  benefits: workout.goalTags.slice(0, 3),
+  description: `${workout.title} is a ${workout.difficulty} ${workout.category} session built around ${workout.prescription.toLowerCase()}.`,
+  steps: buildSteps(workout),
+}));
 
 const includes = (source: string | undefined, target: string) =>
   (source ?? '').toLowerCase().includes(target);
@@ -314,5 +503,11 @@ export function getWorkoutSuggestions(preferences: Preferences) {
   return (goalMatches.length > 0 ? goalMatches : baseMatches.filter((workout) => workout.goalTags.includes('feel healthier')))
     .slice(0, 8);
 }
+
+export const getMealSuggestionById = (id: string) =>
+  mealSuggestions.find((meal) => meal.id === id);
+
+export const getWorkoutSuggestionById = (id: string) =>
+  workoutSuggestions.find((workout) => workout.id === id);
 
 export { mealSuggestions, workoutSuggestions };

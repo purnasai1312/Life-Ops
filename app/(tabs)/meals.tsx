@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Screen } from '@/components/screen';
@@ -20,6 +21,7 @@ import {
 import type { MealEntry, MealType } from '@/store/types';
 import { formatShortDate, lastNDates } from '@/utils/date';
 import { getMealSuggestions } from '@/utils/suggestions';
+import { getMealDetailRoute } from '@/utils/lifeops-logic';
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
@@ -34,6 +36,7 @@ const emptyForm = {
 };
 
 export default function MealsScreen() {
+  const router = useRouter();
   const preferences = useAppStore((s) => s.preferences);
   const meals = useAppStore((s) => s.meals);
   const loadMeals = useAppStore((s) => s.loadMeals);
@@ -44,6 +47,8 @@ export default function MealsScreen() {
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState<MealEntry | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [tab, setTab] = useState<'suggested' | 'today' | 'history'>('suggested');
   const [range, setRange] = useState<'7' | '30'>('7');
 
@@ -89,7 +94,11 @@ export default function MealsScreen() {
   };
 
   const submit = async () => {
-    if (!form.foodName.trim()) return;
+    setFeedback(null);
+    if (!form.foodName.trim()) {
+      setFeedback({ type: 'error', message: 'Add a food name before saving.' });
+      return;
+    }
     setSaving(true);
     const payload = {
       mealType: form.mealType,
@@ -107,7 +116,11 @@ export default function MealsScreen() {
       } else {
         await addMeal(payload);
       }
+      setFeedback({ type: 'success', message: editing ? 'Meal updated.' : 'Meal logged.' });
       reset();
+    } catch (error) {
+      if (__DEV__) console.warn('Meal save failed', error);
+      setFeedback({ type: 'error', message: 'Could not save meal. Please try again.' });
     } finally {
       setSaving(false);
     }
@@ -127,7 +140,19 @@ export default function MealsScreen() {
   };
 
   const remove = (meal: MealEntry) => {
-    const run = () => deleteMeal(meal.id).catch(() => {});
+    const run = async () => {
+      setDeletingId(meal.id);
+      setFeedback(null);
+      try {
+        await deleteMeal(meal.id);
+        setFeedback({ type: 'success', message: 'Meal deleted.' });
+      } catch (error) {
+        if (__DEV__) console.warn('Meal delete failed', error);
+        setFeedback({ type: 'error', message: 'Could not delete meal. Please try again.' });
+      } finally {
+        setDeletingId(null);
+      }
+    };
     if (Platform.OS === 'web') {
       if (typeof window !== 'undefined' && window.confirm(`Delete ${meal.foodName}?`)) run();
       return;
@@ -189,6 +214,12 @@ export default function MealsScreen() {
         onChange={setTab}
       />
 
+      {feedback ? (
+        <Typo variant="caption" color={feedback.type === 'error' ? Colors.error : Colors.forest}>
+          {feedback.message}
+        </Typo>
+      ) : null}
+
       {tab === 'suggested' ? (
         <Animated.View entering={FadeInDown.delay(125).duration(500)} style={{ gap: 12 }}>
           <View style={{ gap: 4 }}>
@@ -201,7 +232,12 @@ export default function MealsScreen() {
           </View>
           <View style={{ gap: 10 }}>
             {suggestions.map((meal) => (
-              <Card key={meal.title} padding={16}>
+              <Pressable
+                key={meal.id}
+                onPress={() => router.push(getMealDetailRoute(meal.id) as never)}
+                style={({ pressed }) => ({ opacity: pressed ? 0.82 : 1 })}
+              >
+              <Card padding={16}>
                 <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
                   <View style={{ flex: 1, gap: 4 }}>
                     <Typo variant="bodyEmphasis">{meal.title}</Typo>
@@ -211,25 +247,15 @@ export default function MealsScreen() {
                     <Typo variant="caption">{meal.notes}</Typo>
                   </View>
                   <Button
-                    title="Add"
-                    icon="add"
+                    title="View"
+                    icon="chevron-forward"
                     size="sm"
                     variant="secondary"
-                    onPress={() =>
-                      addMeal({
-                        mealType: meal.mealType,
-                        foodName: meal.title,
-                        calories: meal.calories,
-                        proteinG: meal.proteinG,
-                        carbsG: meal.carbsG,
-                        fatG: meal.fatG,
-                        notes: meal.notes,
-                        date: today,
-                      }).catch(() => {})
-                    }
+                    onPress={() => router.push(getMealDetailRoute(meal.id) as never)}
                   />
                 </View>
               </Card>
+              </Pressable>
             ))}
           </View>
         </Animated.View>
@@ -324,11 +350,12 @@ export default function MealsScreen() {
               icon="restaurant-outline"
               title="No meals logged today"
               description="Log a meal manually or add one from suggestions."
+              cta={{ label: 'Add from suggestions', icon: 'sparkles-outline', onPress: () => setTab('suggested') }}
             />
           ) : (
             <View style={{ gap: 10 }}>
               {todayMeals.map((meal) => (
-                <MealCard key={meal.id} meal={meal} onEdit={startEdit} onDelete={remove} />
+                <MealCard key={meal.id} meal={meal} onEdit={startEdit} onDelete={remove} deleting={deletingId === meal.id} />
               ))}
             </View>
           )}
@@ -352,6 +379,7 @@ export default function MealsScreen() {
             icon="restaurant-outline"
             title="No meals logged"
             description="Log your first meal to see calories, protein, and daily totals here."
+            cta={{ label: 'Log a meal', icon: 'add', onPress: () => setTab('today') }}
           />
         ) : (
           <View style={{ gap: 10 }}>
@@ -429,7 +457,7 @@ function Segmented<T extends string>({ options, value, onChange }: { options: re
   );
 }
 
-function MealCard({ meal, onEdit, onDelete, flat }: { meal: MealEntry; onEdit: (meal: MealEntry) => void; onDelete: (meal: MealEntry) => void; flat?: boolean }) {
+function MealCard({ meal, onEdit, onDelete, flat, deleting }: { meal: MealEntry; onEdit: (meal: MealEntry) => void; onDelete: (meal: MealEntry) => void; flat?: boolean; deleting?: boolean }) {
   const content = (
     <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
       <View
@@ -451,11 +479,11 @@ function MealCard({ meal, onEdit, onDelete, flat }: { meal: MealEntry; onEdit: (
         </Typo>
         {meal.notes ? <Typo variant="caption">{meal.notes}</Typo> : null}
       </View>
-      <Pressable onPress={() => onEdit(meal)} hitSlop={8} style={{ padding: 4 }}>
+      <Pressable onPress={() => onEdit(meal)} disabled={deleting} hitSlop={8} style={{ padding: 4, opacity: deleting ? 0.4 : 1 }}>
         <Ionicons name="create-outline" size={18} color={Colors.inkMuted} />
       </Pressable>
-      <Pressable onPress={() => onDelete(meal)} hitSlop={8} style={{ padding: 4 }}>
-        <Ionicons name="trash-outline" size={18} color={Colors.inkMuted} />
+      <Pressable onPress={() => onDelete(meal)} disabled={deleting} hitSlop={8} style={{ padding: 4, opacity: deleting ? 0.4 : 1 }}>
+        <Ionicons name={deleting ? 'hourglass-outline' : 'trash-outline'} size={18} color={Colors.inkMuted} />
       </Pressable>
     </View>
   );

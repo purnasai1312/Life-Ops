@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -40,6 +40,8 @@ export default function ProfileScreen() {
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [busyAction, setBusyAction] = useState<'logout' | 'reset' | 'clear' | null>(null);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     loadProfile().catch(() => {});
@@ -66,6 +68,11 @@ export default function ProfileScreen() {
   }, [preferences]);
 
   const save = async () => {
+    setFeedback(null);
+    if (!form.name.trim()) {
+      setFeedback({ type: 'error', message: 'Add your name before saving.' });
+      return;
+    }
     setSaving(true);
     setSaved(false);
     try {
@@ -75,29 +82,66 @@ export default function ProfileScreen() {
         workoutPreferences: form.workoutPreferences.split(',').map((item) => item.trim()).filter(Boolean),
       });
       setSaved(true);
+      setFeedback({ type: 'success', message: 'Profile saved.' });
       setTimeout(() => setSaved(false), 1600);
+    } catch (error) {
+      if (__DEV__) console.warn('Profile save failed', error);
+      setFeedback({ type: 'error', message: 'Could not save profile. Please try again.' });
     } finally {
       setSaving(false);
     }
   };
 
   const logout = async () => {
-    await signOut();
-    resetAll();
-    router.replace('/(auth)/login');
+    Alert.alert('Log out?', 'You can sign back in anytime.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log out',
+        style: 'destructive',
+        onPress: async () => {
+          setBusyAction('logout');
+          try {
+            await signOut();
+            resetAll();
+            router.replace('/(auth)/login');
+          } catch (error) {
+            if (__DEV__) console.warn('Logout failed', error);
+            setFeedback({ type: 'error', message: 'Could not log out. Please try again.' });
+          } finally {
+            setBusyAction(null);
+          }
+        },
+      },
+    ]);
   };
 
   const resetFlow = async () => {
-    await resetOnboardingForTesting();
-    await signOut();
-    resetAll();
-    router.replace('/(auth)/login');
+    setBusyAction('reset');
+    try {
+      await resetOnboardingForTesting();
+      await signOut();
+      resetAll();
+      router.replace('/(auth)/login');
+    } catch (error) {
+      if (__DEV__) console.warn('Reset flow failed', error);
+      setFeedback({ type: 'error', message: 'Could not reset onboarding. Please try again.' });
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const developerReset = async () => {
-    await developerResetSession();
-    resetAll();
-    router.replace('/(auth)/login');
+    setBusyAction('clear');
+    try {
+      await developerResetSession();
+      resetAll();
+      router.replace('/(auth)/login');
+    } catch (error) {
+      if (__DEV__) console.warn('Local session clear failed', error);
+      setFeedback({ type: 'error', message: 'Could not clear local session. Please try again.' });
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   return (
@@ -149,7 +193,7 @@ export default function ProfileScreen() {
             <View style={{ flex: 1, gap: 2 }}>
               <Typo variant="bodyEmphasis">{form.name || 'LifeOps user'}</Typo>
               <Typo variant="caption" color={Colors.inkMuted}>
-                {user?.email ?? 'Signed in with Supabase'}
+                {user?.email ?? 'Signed in'}
               </Typo>
             </View>
           </View>
@@ -202,8 +246,14 @@ export default function ProfileScreen() {
               icon={saved ? 'checkmark' : 'save-outline'}
               onPress={save}
               loading={saving}
+              disabled={!form.name.trim()}
               fullWidth
             />
+            {feedback ? (
+              <Typo variant="caption" color={feedback.type === 'error' ? Colors.error : Colors.forest}>
+                {feedback.message}
+              </Typo>
+            ) : null}
           </View>
         </Card>
       </Animated.View>
@@ -213,13 +263,13 @@ export default function ProfileScreen() {
           <View style={{ gap: 10 }}>
             <Typo variant="bodyEmphasis">Session</Typo>
             <Typo variant="body" color={Colors.inkMuted}>
-              Sign out on this device. Your Supabase-backed meals, workouts, reflections, and profile stay with your account.
+              Sign out on this device. Your meals, workouts, reflections, and profile stay with your account.
             </Typo>
-            <Button title="Log out" icon="log-out-outline" variant="destructive" onPress={logout} />
+            <Button title="Log out" icon="log-out-outline" variant="destructive" onPress={logout} loading={busyAction === 'logout'} />
             {__DEV__ ? (
               <>
-                <Button title="Reset onboarding test flow" icon="refresh-outline" variant="secondary" onPress={resetFlow} />
-                <Button title="Clear local session test state" icon="trash-outline" variant="secondary" onPress={developerReset} />
+                <Button title="Reset onboarding" icon="refresh-outline" variant="secondary" onPress={resetFlow} loading={busyAction === 'reset'} />
+                <Button title="Clear local session" icon="trash-outline" variant="secondary" onPress={developerReset} loading={busyAction === 'clear'} />
               </>
             ) : null}
           </View>

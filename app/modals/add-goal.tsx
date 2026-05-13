@@ -25,20 +25,38 @@ export default function AddGoalModal() {
   const [category, setCategory] = useState<GoalCategory>('nutrition');
   const [unit, setUnit] = useState<GoalUnit>('grams protein');
   const [target, setTarget] = useState('100');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const canSave = title.trim().length > 0 && Number(target) > 0;
 
   const save = async () => {
-    if (!canSave) return;
-    await addGoal({
-      title,
-      description: description || undefined,
-      color,
-      category,
-      unit,
-      target: Number(target),
-    });
-    if (router.canGoBack()) router.back(); else router.replace('/(tabs)');
+    setError('');
+    if (!title.trim()) {
+      setError('Add a goal name before saving.');
+      return;
+    }
+    if (!(Number(target) > 0)) {
+      setError('Add a target greater than zero.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await addGoal({
+        title,
+        description: description || undefined,
+        color,
+        category,
+        unit,
+        target: Number(target),
+      });
+      if (router.canGoBack()) router.back(); else router.replace('/(tabs)');
+    } catch (saveError) {
+      if (__DEV__) console.warn('Goal creation failed', saveError);
+      setError('Could not create goal. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const pair = accentPair(color);
@@ -236,11 +254,17 @@ export default function AddGoalModal() {
         </ScrollView>
 
           <View style={{ paddingHorizontal: 24, marginTop: 8 }}>
+            {error ? (
+              <Typo variant="caption" color={Colors.error} style={{ marginBottom: 8 }}>
+                {error}
+              </Typo>
+            ) : null}
             <Button
               title="Set goal"
               icon="telescope"
               onPress={save}
               disabled={!canSave}
+              loading={saving}
               fullWidth
               size="lg"
             />

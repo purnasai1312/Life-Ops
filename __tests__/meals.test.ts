@@ -2,10 +2,11 @@ import {
   buildMealInsertPayload,
   buildMealUpdatePayload,
   calculateMealTotals,
+  getMealDetailRoute,
   groupByDate,
   mealSuggestionToMealInput,
 } from '@/utils/lifeops-logic';
-import { getMealSuggestions } from '@/utils/suggestions';
+import { getMealSuggestions, mealSuggestions } from '@/utils/suggestions';
 import type { MealEntry, Preferences } from '@/store/types';
 
 const preferences: Preferences = {
@@ -47,6 +48,11 @@ describe('meal logic', () => {
       protein_g: 40,
       carbs_g: 55,
       fat_g: 14,
+      metadata: {
+        source: 'manual',
+        template_id: null,
+        logged_at: null,
+      },
     });
 
     expect(buildMealUpdatePayload({ foodName: 'Dinner', mealType: 'dinner', proteinG: 35 })).toEqual(
@@ -65,10 +71,10 @@ describe('meal logic', () => {
   });
 
   it('enforces vegan and vegetarian suggestion filters', () => {
-    const forbiddenVegan = /\b(chicken|turkey|salmon|tuna|beef|egg|eggs|yogurt|cheese|dairy|whey|cottage)\b/;
+    const forbiddenVegan = /\b(chicken|turkey|salmon|tuna|beef|egg|eggs|yogurt|cheese|dairy|whey|cottage|honey|fish)\b/;
     for (const meal of getMealSuggestions({ ...preferences, dietPreference: 'vegan', goal: 'gain muscle' })) {
       expect(meal.dietTags).toContain('vegan');
-      expect(`${meal.title} ${meal.notes}`.toLowerCase()).not.toMatch(forbiddenVegan);
+      expect(`${meal.title} ${meal.notes} ${meal.ingredients.join(' ')}`.toLowerCase()).not.toMatch(forbiddenVegan);
     }
     for (const meal of getMealSuggestions({ ...preferences, dietPreference: 'vegetarian' })) {
       expect(meal.dietTags).toContain('vegetarian');
@@ -76,11 +82,61 @@ describe('meal logic', () => {
     }
   });
 
-  it('filters meal suggestions by goal and maps quick-add payloads', () => {
+  it('filters meal suggestions by goal and maps explicit Add to Today payloads', () => {
     const suggestions = getMealSuggestions({ ...preferences, goal: 'gain muscle', dietPreference: 'no preference' });
     expect(suggestions.length).toBeGreaterThan(0);
     expect(suggestions.every((meal) => meal.goalTags.includes('gain muscle'))).toBe(true);
+    expect(getMealDetailRoute(suggestions[0].id)).toEqual({
+      pathname: '/meal-detail',
+      params: { id: suggestions[0].id },
+    });
     const payload = mealSuggestionToMealInput(suggestions[0], '2026-05-11');
-    expect(payload).toEqual(expect.objectContaining({ name: suggestions[0].title, meal_date: '2026-05-11' }));
+    expect(payload).toEqual(expect.objectContaining({
+      name: suggestions[0].title,
+      meal_date: '2026-05-11',
+      metadata: expect.objectContaining({ source: 'suggested', template_id: suggestions[0].id }),
+    }));
+  });
+
+  it('has recipe detail data for every meal suggestion', () => {
+    expect(mealSuggestions.length).toBeGreaterThanOrEqual(15);
+    for (const meal of mealSuggestions) {
+      expect(meal.id).toMatch(/^meal-/);
+      expect(meal.name).toBe(meal.title);
+      expect(meal.ingredients.length).toBeGreaterThan(0);
+      expect(meal.instructions.length).toBeGreaterThan(0);
+      expect(meal.prepTimeMinutes).toBeGreaterThanOrEqual(0);
+      expect(meal.cookTimeMinutes).toBeGreaterThanOrEqual(0);
+      expect(meal.calories).toBeGreaterThan(0);
+      expect(meal.proteinG).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('viewing or cancelling a meal suggestion creates no record', () => {
+    const addMeal = jest.fn();
+    const [suggestion] = getMealSuggestions(preferences);
+    getMealDetailRoute(suggestion.id);
+    expect(addMeal).not.toHaveBeenCalled();
+  });
+
+  it('Add to Today creates exactly one meal record with actual nutrition', () => {
+    const addMeal = jest.fn();
+    const [suggestion] = getMealSuggestions(preferences);
+    addMeal({
+      mealType: suggestion.mealType,
+      foodName: suggestion.name,
+      calories: suggestion.calories,
+      proteinG: suggestion.proteinG,
+      carbsG: suggestion.carbsG,
+      fatG: suggestion.fatG,
+      source: 'suggested',
+      templateId: suggestion.id,
+    });
+    expect(addMeal).toHaveBeenCalledTimes(1);
+    expect(addMeal).toHaveBeenCalledWith(expect.objectContaining({
+      calories: suggestion.calories,
+      proteinG: suggestion.proteinG,
+      templateId: suggestion.id,
+    }));
   });
 });

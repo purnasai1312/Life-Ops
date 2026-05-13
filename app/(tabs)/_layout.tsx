@@ -14,10 +14,9 @@ const TABS: {
 }[] = [
   { name: 'index', label: 'Today', icon: 'sunny-outline', iconActive: 'sunny' },
   { name: 'meals', label: 'Meals', icon: 'restaurant-outline', iconActive: 'restaurant' },
-  { name: 'workouts', label: 'Workouts', icon: 'barbell-outline', iconActive: 'barbell' },
+  { name: 'workouts', label: 'Workout', icon: 'barbell-outline', iconActive: 'barbell' },
   { name: 'activity', label: 'Activity', icon: 'pulse-outline', iconActive: 'pulse' },
-  { name: 'goals', label: 'Goals', icon: 'telescope-outline', iconActive: 'telescope' },
-  { name: 'reflect', label: 'Reflect', icon: 'moon-outline', iconActive: 'moon' },
+  { name: 'habits', label: 'Habits', icon: 'leaf-outline', iconActive: 'leaf' },
   { name: 'profile', label: 'Profile', icon: 'person-circle-outline', iconActive: 'person-circle' },
 ];
 
@@ -121,7 +120,8 @@ export default function TabLayout() {
       {TABS.map((t) => (
         <Tabs.Screen key={t.name} name={t.name} options={{ title: t.label }} />
       ))}
-      <Tabs.Screen name="habits" options={{ href: null }} />
+      <Tabs.Screen name="goals" options={{ href: null }} />
+      <Tabs.Screen name="reflect" options={{ href: null }} />
     </Tabs>
   );
 }

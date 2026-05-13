@@ -163,6 +163,9 @@ interface AppState {
     fatG?: number;
     notes?: string;
     date?: string;
+    source?: 'manual' | 'suggested';
+    templateId?: string;
+    loggedAt?: string;
   }) => Promise<void>;
   updateMeal: (id: string, input: Partial<Omit<MealEntry, 'id' | 'userId' | 'createdAt'>>) => Promise<void>;
   deleteMeal: (id: string) => Promise<void>;
@@ -178,6 +181,12 @@ interface AppState {
     weight?: number;
     notes?: string;
     date?: string;
+    source?: 'manual' | 'suggested';
+    templateId?: string;
+    completedStepsCount?: number;
+    totalStepsCount?: number;
+    estimatedCalories?: number;
+    completedAt?: string;
   }) => Promise<void>;
   updateWorkout: (id: string, input: Partial<Omit<WorkoutLog, 'id' | 'userId' | 'createdAt'>>) => Promise<void>;
   deleteWorkout: (id: string) => Promise<void>;
@@ -256,7 +265,7 @@ export const useAppStore = create<AppState>()(
           const { data, error } = await supabase
             .from('profiles')
             .select(
-              'id,name,age,height,weight,goal,activity_level,diet_preference,workout_preference,workout_preferences,experience_level,calorie_target,protein_target,water_target,workout_frequency_goal,movement_goal,habit_priorities,selected_goals,habits,intentions,focus_statement,has_completed_onboarding,notifications_enabled,week_starts_on_monday'
+              'id,name,age,height,weight,goal,activity_level,diet_preference,workout_preferences,experience_level,calorie_target,protein_target,water_target,workout_frequency_goal,movement_goal,habit_priorities,selected_goals,habits,intentions,focus_statement,has_completed_onboarding,notifications_enabled,week_starts_on_monday'
             )
             .eq('id', userId)
             .maybeSingle();
@@ -290,8 +299,8 @@ export const useAppStore = create<AppState>()(
               goal: data.goal ?? undefined,
               activityLevel: data.activity_level ?? undefined,
               dietPreference: data.diet_preference ?? undefined,
-              workoutPreference: data.workout_preference ?? undefined,
-              workoutPreferences: data.workout_preferences ?? (data.workout_preference ? [data.workout_preference] : undefined),
+              workoutPreference: data.workout_preferences?.[0] ?? undefined,
+              workoutPreferences: data.workout_preferences ?? undefined,
               experienceLevel: data.experience_level ?? undefined,
               calorieTarget: data.calorie_target == null ? undefined : String(data.calorie_target),
               proteinTarget: data.protein_target == null ? undefined : String(data.protein_target),
@@ -339,7 +348,6 @@ export const useAppStore = create<AppState>()(
             goal: next.goal?.trim() || null,
             activity_level: next.activityLevel?.trim() || null,
             diet_preference: next.dietPreference?.trim() || null,
-            workout_preference: next.workoutPreference?.trim() || null,
             workout_preferences: next.workoutPreferences ?? (next.workoutPreference ? [next.workoutPreference] : []),
             experience_level: next.experienceLevel?.trim() || null,
             calorie_target: next.calorieTarget ? Number(next.calorieTarget) || null : null,
@@ -363,7 +371,6 @@ export const useAppStore = create<AppState>()(
               goal: profile.goal,
               activity_level: profile.activity_level,
               diet_preference: profile.diet_preference,
-              workout_preference: profile.workout_preference,
               workout_preferences: profile.workout_preferences,
               experience_level: profile.experience_level,
               calorie_target: profile.calorie_target,
@@ -873,6 +880,11 @@ export const useAppStore = create<AppState>()(
             protein_g: input.proteinG ?? 0,
             carbs_g: input.carbsG ?? 0,
             fat_g: input.fatG ?? 0,
+            metadata: {
+              source: input.source ?? 'manual',
+              template_id: input.templateId ?? null,
+              logged_at: input.loggedAt ?? new Date().toISOString(),
+            },
           })
           .select('id,user_id,name,description,meal_type,meal_date,calories,protein_g,carbs_g,fat_g,created_at')
           .single();
@@ -888,6 +900,9 @@ export const useAppStore = create<AppState>()(
           fatG: asNumber(data.fat_g),
           notes: data.description ?? undefined,
           date: data.meal_date,
+          source: input.source ?? 'manual',
+          templateId: input.templateId,
+          loggedAt: input.loggedAt,
           createdAt: toTimestamp(data.created_at),
         };
         set((state) => ({ meals: [meal, ...state.meals] }));
@@ -941,7 +956,7 @@ export const useAppStore = create<AppState>()(
           const userId = await getCurrentUserId();
           const { data: workoutsData, error } = await supabase
             .from('workouts')
-            .select('id,user_id,title,workout_type,scheduled_for,duration_minutes,notes,created_at')
+            .select('id,user_id,title,workout_type,scheduled_for,completed_at,duration_minutes,notes,metadata,created_at')
             .eq('user_id', userId)
             .gte('scheduled_for', daysAgoISO(29))
             .order('scheduled_for', { ascending: false })
@@ -973,6 +988,12 @@ export const useAppStore = create<AppState>()(
                 weight: entry?.weight == null ? undefined : asNumber(entry.weight),
                 notes: row.notes ?? undefined,
                 date: row.scheduled_for ?? todayISO(),
+                source: row.metadata?.source,
+                templateId: row.metadata?.template_id ?? undefined,
+                completedStepsCount: row.metadata?.completed_steps_count ?? undefined,
+                totalStepsCount: row.metadata?.total_steps_count ?? undefined,
+                estimatedCalories: row.metadata?.estimated_calories ?? undefined,
+                completedAt: row.completed_at ?? undefined,
                 createdAt: toTimestamp(row.created_at),
               };
             }),
@@ -996,10 +1017,18 @@ export const useAppStore = create<AppState>()(
             title,
             workout_type: input.workoutType,
             scheduled_for: input.date || todayISO(),
+            completed_at: input.completedAt ?? (input.source === 'suggested' ? new Date().toISOString() : null),
             duration_minutes: input.durationMinutes ?? 0,
             notes: input.notes?.trim() || null,
+            metadata: {
+              source: input.source ?? 'manual',
+              template_id: input.templateId ?? null,
+              completed_steps_count: input.completedStepsCount ?? null,
+              total_steps_count: input.totalStepsCount ?? null,
+              estimated_calories: input.estimatedCalories ?? null,
+            },
           })
-          .select('id,user_id,workout_type,scheduled_for,duration_minutes,notes,created_at')
+          .select('id,user_id,workout_type,scheduled_for,completed_at,duration_minutes,notes,metadata,created_at')
           .single();
         if (error) throw error;
         if (input.exerciseName?.trim()) {
@@ -1024,6 +1053,12 @@ export const useAppStore = create<AppState>()(
           weight: input.weight,
           notes: data.notes ?? undefined,
           date: data.scheduled_for,
+          source: input.source ?? 'manual',
+          templateId: input.templateId,
+          completedStepsCount: input.completedStepsCount,
+          totalStepsCount: input.totalStepsCount,
+          estimatedCalories: input.estimatedCalories,
+          completedAt: data.completed_at ?? undefined,
           createdAt: toTimestamp(data.created_at),
         };
         set((state) => ({ workouts: [workout, ...state.workouts] }));

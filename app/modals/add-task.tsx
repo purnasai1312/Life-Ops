@@ -16,11 +16,16 @@ export default function AddTaskModal() {
 
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
+  const [error, setError] = useState('');
 
   const canSave = title.trim().length > 0;
 
   const save = () => {
-    if (!canSave) return;
+    setError('');
+    if (!canSave) {
+      setError('Add a task name before saving.');
+      return;
+    }
     addTask({ title, note: note || undefined });
     if (router.canGoBack()) router.back(); else router.replace('/(tabs)');
   };
@@ -119,6 +124,7 @@ export default function AddTaskModal() {
               fullWidth
               size="lg"
             />
+            {error ? <Typo variant="caption" color={Colors.error}>{error}</Typo> : null}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

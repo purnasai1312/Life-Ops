@@ -114,12 +114,14 @@ export default function TodayScreen() {
   const movementGoal = Math.max(1, Number(preferences.movementGoal) || 8000);
   const stepsToday = todayActivity?.steps ?? 0;
   const stepPercentage = Math.max(0, Math.min(100, (stepsToday / movementGoal) * 100));
-  const activityWorkoutLogged =
-    (todayActivity?.workoutsCount ?? 0) > 0 || (todayActivity?.exerciseMinutes ?? 0) > 0;
-  const hasWorkoutToday = todayWorkouts.length > 0 || activityWorkoutLogged;
-  const workoutMinutes =
-    todayWorkouts.reduce((sum, workout) => sum + workout.durationMinutes, 0) +
-    (todayActivity?.exerciseMinutes ?? 0);
+  const completedWorkoutLogs = todayWorkouts.filter(
+    (workout) => workout.workoutType !== 'rest day'
+  );
+  const hasWorkoutToday = completedWorkoutLogs.length > 0;
+  const workoutMinutes = completedWorkoutLogs.reduce(
+    (sum, workout) => sum + workout.durationMinutes,
+    0
+  );
   const hasReflectionToday = moods.some((m) => m.date === today);
   const goalProgress = dashboardSummary.goalProgress;
   const calculatedDailyScore = calculateDailyScore({

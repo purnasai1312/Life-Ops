@@ -76,4 +76,23 @@ describe('dashboard logic', () => {
     expect(summary.activitySummary.stepsPercentage).toBe(0);
     expect(calculateActivitySummary(undefined, 8000).steps).toBe(0);
   });
+
+  it('does not count suggestions, rest days, or activity minutes as completed workout logs', () => {
+    expect(
+      calculateDashboardState({
+        workouts: [{ id: 'rest', userId: 'u1', workoutType: 'rest day', durationMinutes: 0, date: today, createdAt: 1 }],
+        activity: {
+          date: today,
+          source: 'manual',
+          steps: 6000,
+          caloriesBurned: 200,
+          activeMinutes: 30,
+          exerciseMinutes: 20,
+          distanceMeters: 3000,
+          workoutsCount: 1,
+        },
+        today,
+      }).workoutLogged
+    ).toBe(false);
+  });
 });

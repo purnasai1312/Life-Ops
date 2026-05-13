@@ -39,6 +39,8 @@ export default function ReflectScreen() {
   const [value, setValue] = useState<MoodValue | null>(todayMood?.value ?? null);
   const [note, setNote] = useState(todayMood?.note ?? '');
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const [range, setRange] = useState<'today' | '7' | '30'>('7');
 
   useEffect(() => {
@@ -46,13 +48,25 @@ export default function ReflectScreen() {
   }, [loadReflections]);
 
   const submit = useCallback(async () => {
-    if (value == null) return;
-    await logMood(value, note);
-    setSaved(true);
-    if (Platform.OS === 'ios') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    setError('');
+    if (value == null) {
+      setError('Choose how you feel before saving.');
+      return;
     }
-    setTimeout(() => setSaved(false), 2000);
+    setSaving(true);
+    try {
+      await logMood(value, note);
+      setSaved(true);
+      if (Platform.OS === 'ios') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+      setTimeout(() => setSaved(false), 2000);
+    } catch (saveError) {
+      if (__DEV__) console.warn('Reflection save failed', saveError);
+      setError('Could not save your check-in. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   }, [logMood, note, value]);
 
   const week = useMemo(() => lastNDates(7), []);
@@ -83,7 +97,7 @@ export default function ReflectScreen() {
   );
 
   return (
-    <Screen>
+    <Screen bottomPadding={64}>
       <Animated.View entering={FadeInDown.duration(500)} style={{ gap: 6 }}>
         <Typo variant="eyebrow" color={Colors.accent}>
           Reflection · be honest
@@ -193,8 +207,10 @@ export default function ReflectScreen() {
               icon={saved ? 'checkmark' : 'leaf-outline'}
               onPress={submit}
               disabled={value == null}
+              loading={saving}
               fullWidth
             />
+            {error ? <Typo variant="caption" color={Colors.error}>{error}</Typo> : null}
           </View>
         </Card>
       </Animated.View>

@@ -263,18 +263,22 @@ export default function SignupScreen() {
                 backgroundColor: AuthColors.card,
                 borderWidth: 1,
                 borderColor: AuthColors.border,
-                opacity: pressed ? 0.8 : 1,
+                opacity: pressed ? 0.8 : isLoading ? 0.6 : 1,
                 transform: [{ scale: pressed ? 0.98 : 1 }],
               })}
             >
-              <Typo style={{ fontFamily: Fonts.bold, fontSize: 16, color: AuthColors.text }}>
-                G
-              </Typo>
-              <Typo
-                style={{ fontFamily: Fonts.medium, fontSize: 15, color: AuthColors.text }}
-              >
-                Continue with Google
-              </Typo>
+              {isLoading ? (
+                <ActivityIndicator color={AuthColors.text} />
+              ) : (
+                <>
+                  <Typo style={{ fontFamily: Fonts.bold, fontSize: 16, color: AuthColors.text }}>
+                    G
+                  </Typo>
+                  <Typo style={{ fontFamily: Fonts.medium, fontSize: 15, color: AuthColors.text }}>
+                    Continue with Google
+                  </Typo>
+                </>
+              )}
             </Pressable>
 
             {Platform.OS === 'ios' ? (
@@ -291,16 +295,20 @@ export default function SignupScreen() {
                   backgroundColor: AuthColors.card,
                   borderWidth: 1,
                   borderColor: AuthColors.border,
-                  opacity: pressed ? 0.8 : 1,
+                  opacity: pressed ? 0.8 : isLoading ? 0.6 : 1,
                   transform: [{ scale: pressed ? 0.98 : 1 }],
                 })}
               >
-                <Ionicons name="logo-apple" size={18} color={AuthColors.text} />
-                <Typo
-                  style={{ fontFamily: Fonts.medium, fontSize: 15, color: AuthColors.text }}
-                >
-                  Continue with Apple
-                </Typo>
+                {isLoading ? (
+                  <ActivityIndicator color={AuthColors.text} />
+                ) : (
+                  <>
+                    <Ionicons name="logo-apple" size={18} color={AuthColors.text} />
+                    <Typo style={{ fontFamily: Fonts.medium, fontSize: 15, color: AuthColors.text }}>
+                      Continue with Apple
+                    </Typo>
+                  </>
+                )}
               </Pressable>
             ) : null}
           </Animated.View>

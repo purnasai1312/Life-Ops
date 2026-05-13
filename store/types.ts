@@ -101,6 +101,9 @@ export interface MealEntry {
   fatG: number;
   notes?: string;
   date: string;
+  source?: 'manual' | 'suggested';
+  templateId?: string;
+  loggedAt?: string;
   createdAt: number;
 }
 
@@ -117,6 +120,12 @@ export interface WorkoutLog {
   weight?: number;
   notes?: string;
   date: string;
+  source?: 'manual' | 'suggested';
+  templateId?: string;
+  completedStepsCount?: number;
+  totalStepsCount?: number;
+  estimatedCalories?: number;
+  completedAt?: string;
   createdAt: number;
 }
 

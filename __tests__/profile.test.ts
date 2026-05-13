@@ -21,7 +21,6 @@ describe('profile logic', () => {
       name: 'Purna',
       goal: 'gain muscle',
       diet_preference: 'vegan',
-      workout_preference: 'home',
       workout_preferences: ['home', 'walking'],
       habit_priorities: ['protein', 'sleep'],
       selected_goals: ['protein'],

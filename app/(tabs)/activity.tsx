@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
@@ -36,6 +36,9 @@ const formatSyncTime = (value?: string) => {
     minute: '2-digit',
   });
 };
+
+const unavailableMessage =
+  'Health sync is unavailable in this version. You can still add activity manually.';
 
 export default function ActivityScreen() {
   const preferences = useAppStore((state) => state.preferences);
@@ -113,7 +116,10 @@ export default function ActivityScreen() {
     try {
       const result = await healthSync.requestHealthPermissions();
       setAvailability(result);
-      setMessage(result.message);
+      setMessage(result.available ? result.message : unavailableMessage);
+    } catch (error) {
+      if (__DEV__) console.warn('Health permission request failed', error);
+      setMessage('Could not connect health data. You can still add activity manually.');
     } finally {
       setLoading(false);
     }
@@ -126,20 +132,26 @@ export default function ActivityScreen() {
       const currentAvailability = availability ?? (await healthSync.isHealthSyncAvailable());
       if (!currentAvailability.available) {
         setAvailability(currentAvailability);
-        setMessage('Native sync is unavailable in this build. Add today manually below.');
+        setMessage(unavailableMessage);
         return;
       }
       await syncDailyActivity(today);
       await loadDailyActivity();
       setMessage('Activity refreshed for today.');
     } catch (error) {
-      setMessage((error as Error).message);
+      if (__DEV__) console.warn('Activity sync failed', error);
+      setMessage('Could not refresh activity. You can still add it manually.');
     } finally {
       setLoading(false);
     }
   };
 
   const saveManual = async () => {
+    const hasAnyValue = Object.values(manual).some((value) => Number(value) > 0);
+    if (!hasAnyValue) {
+      setMessage('Add at least one activity value before saving.');
+      return;
+    }
     setLoading(true);
     setMessage(undefined);
     try {
@@ -163,8 +175,10 @@ export default function ActivityScreen() {
         workoutsCount: '',
       });
       setMessage('Manual activity saved.');
+      Alert.alert('Activity saved', 'Today’s activity was updated.');
     } catch (error) {
-      setMessage((error as Error).message);
+      if (__DEV__) console.warn('Manual activity save failed', error);
+      setMessage('Could not save activity. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -210,7 +224,11 @@ export default function ActivityScreen() {
             {availability?.status ?? 'checking'}
           </Typo>
         </View>
-        {availability?.message ? <Typo variant="caption">{availability.message}</Typo> : null}
+        {availability?.message ? (
+          <Typo variant="caption">
+            {availability.available ? availability.message : unavailableMessage}
+          </Typo>
+        ) : null}
         {message ? <Typo variant="caption" color={Colors.accent}>{message}</Typo> : null}
         <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
           <Button
@@ -335,7 +353,14 @@ export default function ActivityScreen() {
             <TextField label="Workouts" value={manual.workoutsCount} onChangeText={(workoutsCount) => setManual((s) => ({ ...s, workoutsCount }))} {...numberInput} />
           </View>
         </View>
-        <Button title="Save manual activity" icon="checkmark-circle-outline" onPress={saveManual} loading={loading} fullWidth />
+        <Button
+          title="Save manual activity"
+          icon="checkmark-circle-outline"
+          onPress={saveManual}
+          loading={loading}
+          disabled={!Object.values(manual).some((value) => Number(value) > 0)}
+          fullWidth
+        />
       </Card>
     </Screen>
   );
